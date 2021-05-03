@@ -2,15 +2,29 @@
 
 ## Introduction
 
+With the discovery of Spectre and Meltdown in 2017, a new class of vulnerabilities was born: transient execution vulnerabilities. These are also known as speculative execution vulnerabilities or microarchitectural CPU vulnerabilities. As computer scientists or programmers we are used to working with abstractions, and as security professionals we know that vulnerabilities are often found were abstractions meet implementations. This holds true for transient execution vulnerabilities as well: programs that are perfectly secure under the typical CPU abstraction that assumes deterministic execution are decidedly less so when they meet actual CPU implementations that use out-of-order execution, speculative execution and branch prediction. Since these vulnerabilities depend on specific CPU features, different CPU architectures and models are affected to very different degrees. 
+
+In addition to the different Spectre and Meltdown variants, another class of transient execution vulnerabilities was found later, commonly known as microarchitectural data sampling (MDS) or rogue in-flight data load (RIDL). These use various CPU internal buffers to leak data.
+
+In this work, we attempt to give an overview of the different transient execution vulnerabilities that have been found since 2017, including a brief description of the CPU features that are being exploited and the attacker model that is assumed.
+
+TODO:
+- Add sentence on the different archs that we look at (ARM64).
+- Add sentence on the PoCs.
+
 ### CPU features
 
+The various Spectre and Meltdown variants in particular rely on out-of-order execution, speculative execution and branch prediction to leak CPU internal information to an attacker. The MDS or RIDL vulnerabilities that were found later additionally rely on various CPU internal buffers to leak secrets across hyperthreads.
+
 #### Out-of-order Execution
+
+
 
 #### Speculative Execution
 
 #### Branch Prediction
 
-#### CPU internal buffers
+#### Hyperthreads & CPU internal buffers
 
 
 ### Attacker model(s)
@@ -25,7 +39,7 @@
 #### ...
 
 
-## Spectre & Meltdown
+## Spectre & Meltdown Variants
 
 ### Spectre v1 - Bounds Check Bypass (BCB)
 
