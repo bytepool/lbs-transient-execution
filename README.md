@@ -2,7 +2,7 @@
 
 ## Introduction & Background
 
-With the discovery of Spectre and Meltdown in 2017, a new class of vulnerabilities was born: transient execution vulnerabilities. These are also known as speculative execution vulnerabilities or microarchitectural CPU vulnerabilities. As computer scientists or programmers we are used to working with abstractions, and as security professionals we know that vulnerabilities are often found were abstractions meet implementations. This holds true for transient execution vulnerabilities as well: programs that are perfectly secure under the typical CPU abstraction that assumes deterministic execution are decidedly less so when they meet actual CPU implementations that use out-of-order execution, speculative execution and branch prediction. Since these vulnerabilities depend on specific CPU features, different CPU architectures and models are affected to very different degrees. 
+With the discovery of Spectre and Meltdown in 2017, a new class of vulnerabilities was born: transient execution vulnerabilities. These are also known as speculative execution vulnerabilities or microarchitectural CPU vulnerabilities. As computer scientists or programmers we are used to working with abstractions, and as security professionals we know that vulnerabilities are often found were abstractions meet implementations. This holds true for transient execution vulnerabilities as well: programs that are perfectly secure under the typical CPU abstraction that assumes deterministic execution are decidedly less so when they meet actual CPU implementations that use out-of-order execution, speculative execution and branch prediction. Since these vulnerabilities depend on specific CPU features, different CPU architectures and models are affected to very different degrees.
 
 In addition to the different Spectre and Meltdown variants, another class of transient execution vulnerabilities was found later, commonly known as microarchitectural data sampling (MDS) or rogue in-flight data load (RIDL). These use various CPU internal buffers to leak data.
 
@@ -14,33 +14,49 @@ TODO:
 
 ### CPU features for performance optimization
 
-Since memory access is orders of magnitude slower than modern CPUs, CPU manufacturers have come up with clever performance optimizations to effectively use the time while waiting for memory access operations to complete. These performance optimizations include the CPU features discussed in this section, and without these features many tasks run significantly slower, in some cases even 10x slower. However, it also these optimizations that have lead to the vulnerabilities discussed in this report. 
+Since memory access is orders of magnitude slower than modern CPUs, CPU manufacturers have come up with clever performance optimizations to effectively use the time while waiting for memory access operations to complete. These performance optimizations include the CPU features discussed in this section, and without these features many tasks run significantly slower, in some cases even 10x slower. However, it also these optimizations that have lead to the vulnerabilities discussed in this report.
 
-The various Spectre and Meltdown variants in particular rely on out-of-order execution, speculative execution and branch prediction to leak CPU internal information to an attacker. The MDS or RIDL vulnerabilities that were found later additionally rely on various CPU internal buffers to leak secrets across hyperthreads. 
+The various Spectre and Meltdown variants in particular rely on out-of-order execution, speculative execution and branch prediction to leak CPU internal information to an attacker. The MDS or RIDL vulnerabilities that were found later additionally rely on various CPU internal buffers to leak secrets across hyperthreads.
 
 In the following subsections, we will shortly outline what these CPU features do and how they work.
 
 #### Out-of-order Execution, Speculative Execution and Branch Prediction
 
-As programmers, we think of CPU instructions as being executed sequentially, one by one, but in practice instructions can be executed out-of-order. This happens when one or more previous instructions are waiting to complete, and the following instructions have no data dependency on the previous instructions. Simply put, if instructions don't need to know any of the resulting values of the previous instructions, they are ready to execute and the CPU will put them in a pipeline.
+As programmers, we think of CPU instructions as being executed sequentially, one by one, but in practice instructions can be executed out-of-order, aptly named *out-of-order execution*. This happens when one or more previous instructions are waiting to complete, and the following instructions have no data dependency on the previous instructions. Simply put, if instructions don't need to know any of the resulting values of the previous instructions, they are ready to execute and the CPU will put them in a pipeline.
 
 Note that we specifically qualify the instruction dependency to data dependencies, because control flow dependencies might be ignored if speculative execution is allowed. Speculative execution takes the idea of using the waiting time effectively even further, by allowing the execution of branches without knowing if they will be taken or not, i.e., executing them speculatively. This is where branch prediction comes in: based on previous executions, the CPU guesses which branch will be executed next.
 The important part is that speculative execution is CPU internal, nothing that is executed speculatively is written back to memory, and if it turns out that a branch was taken in error, the CPU can roll back its internal state to before the branch was taken. However, speculative execution has side-effects such as affecting the CPU caches that are not rolled back, so that some information of the speculated branches can leak through side-channels.
 
+#### Simultaneous Multithreading (SMT) & CPU internal buffers
 
-#### Hyperthreads & CPU internal buffers
+Another speed optimization that CPU manufacturers introduced to modern architectures is so called *simultaneous multithreading (SMT)*, which makes a single CPU core look like multiple CPUs to the operating system because this allows additional CPU internal optimizations. Intel's implementation of SMT is called *Hyper-Threading Technology (HTT)*. Threads share certain internal resources, such as caches and buffers, which makes it possible for information to leak from one thread to another through side-channels that use the shared resources. In this section we will only highlight a few specific buffers that have been used in MDS/RIDL to date.
+
+TODO: write a description of these buffers.
+
+- Fill buffer.
+- Store buffer.
+- Load port buffer.
+- Uncacheable memory.
+- ?
 
 
-### Attacker model(s)
-
-
-### Relevant Cache Side Channel Attacks
+### Relevant Cache Side-Channel Attacks
 
 #### Flush+Reload
 
 #### Evict+Reload
 
 #### ...
+
+
+### Attacker model(s)
+
+Looking at transient execution vulnerabilities, a relevant question is under which circumstances they can be exploited. Let us establish some terminology first:
+- There is a *secret* which the *attacker* wants to leak, for instance the root password hash stored in /etc/shadow.
+- The secret is loaded into memory by a *target process*, for instance by an ssh server.
+- The attacker can execute an *exploit* that implements a side-channel attack.
+
+In general, the exploit must be executed on the same CPU core or thread as the target process, and in most cases the exploit must also be able to control when the target process loads the secret, for instance by attempting to log into the ssh server.
 
 
 ## Spectre & Meltdown Variants
