@@ -20,16 +20,13 @@ The various Spectre and Meltdown variants in particular rely on out-of-order exe
 
 In the following subsections, we will shortly outline what these CPU features do and how they work.
 
-#### Out-of-order and Speculative Execution
+#### Out-of-order Execution, Speculative Execution and Branch Prediction
 
 As programmers, we think of CPU instructions as being executed sequentially, one by one, but in practice instructions can be executed out-of-order. This happens when one or more previous instructions are waiting to complete, and the following instructions have no data dependency on the previous instructions. Simply put, if instructions don't need to know any of the resulting values of the previous instructions, they are ready to execute and the CPU will put them in a pipeline.
 
-Note that we specifically qualify the instruction dependency to data dependencies, because control flow dependencies might be ignored if speculative execution is allowed. TODO: explain SE here.
+Note that we specifically qualify the instruction dependency to data dependencies, because control flow dependencies might be ignored if speculative execution is allowed. Speculative execution takes the idea of using the waiting time effectively even further, by allowing the execution of branches without knowing if they will be taken or not, i.e., executing them speculatively. This is where branch prediction comes in: based on previous executions, the CPU guesses which branch will be executed next.
+The important part is that speculative execution is CPU internal, nothing that is executed speculatively is written back to memory, and if it turns out that a branch was taken in error, the CPU can roll back its internal state to before the branch was taken. However, speculative execution has side-effects such as affecting the CPU caches that are not rolled back, so that some information of the speculated branches can leak through side-channels.
 
-Example sentence^[example reference here] here.
-
-
-#### Branch Prediction
 
 #### Hyperthreads & CPU internal buffers
 
