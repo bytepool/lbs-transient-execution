@@ -1,6 +1,6 @@
 # An Overview of Transient Execution Vulnerabilities
 
-## Introduction
+## Introduction & Background
 
 With the discovery of Spectre and Meltdown in 2017, a new class of vulnerabilities was born: transient execution vulnerabilities. These are also known as speculative execution vulnerabilities or microarchitectural CPU vulnerabilities. As computer scientists or programmers we are used to working with abstractions, and as security professionals we know that vulnerabilities are often found were abstractions meet implementations. This holds true for transient execution vulnerabilities as well: programs that are perfectly secure under the typical CPU abstraction that assumes deterministic execution are decidedly less so when they meet actual CPU implementations that use out-of-order execution, speculative execution and branch prediction. Since these vulnerabilities depend on specific CPU features, different CPU architectures and models are affected to very different degrees. 
 
@@ -12,15 +12,20 @@ TODO:
 - Add sentence on the different archs that we look at (ARM64).
 - Add sentence on the PoCs.
 
-### CPU features
+### CPU features for performance optimization
 
-The various Spectre and Meltdown variants in particular rely on out-of-order execution, speculative execution and branch prediction to leak CPU internal information to an attacker. The MDS or RIDL vulnerabilities that were found later additionally rely on various CPU internal buffers to leak secrets across hyperthreads.
+Since memory access is orders of magnitude slower than modern CPUs, CPU manufacturers have come up with clever performance optimizations to effectively use the time while waiting for memory access operations to complete. These performance optimizations include the CPU features discussed in this section, and without these features many tasks run significantly slower, in some cases even 10x slower. However, it also these optimizations that have lead to the vulnerabilities discussed in this report. 
 
-#### Out-of-order Execution
+The various Spectre and Meltdown variants in particular rely on out-of-order execution, speculative execution and branch prediction to leak CPU internal information to an attacker. The MDS or RIDL vulnerabilities that were found later additionally rely on various CPU internal buffers to leak secrets across hyperthreads. 
 
+In the following subsections, we will shortly outline what these CPU features do and how they work.
 
+#### Out-of-order and Speculative Execution
 
-#### Speculative Execution
+As programmers, we think of CPU instructions as being executed sequentially, one by one, but in practice instructions can be executed out-of-order. This happens when one or more previous instructions are waiting to complete, and the following instructions have no data dependency on the previous instructions. Simply put, if instructions don't need to know any of the resulting values of the previous instructions, they are ready to execute and the CPU will put them in a pipeline.
+
+Note that we specifically qualify the instruction dependency to data dependencies, because control flow dependencies might be ignored if speculative execution is allowed. TODO: explain SE here.
+
 
 #### Branch Prediction
 
