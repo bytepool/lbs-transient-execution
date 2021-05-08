@@ -26,6 +26,8 @@ As programmers, we think of CPU instructions as being executed sequentially, one
 
 Note that we specifically qualify the instruction dependency to data dependencies, because control flow dependencies might be ignored if speculative execution is allowed. TODO: explain SE here.
 
+Example sentence^[example reference here] here.
+
 
 #### Branch Prediction
 
