@@ -158,10 +158,12 @@ There are two typical ways to exploit this vulnerability:
    lets the attacker predict which memory accesses of the sensitive code can
    displace which parts of her own data from the cache.
 
-Modern operating systems mitigate the Meltdown attack by not keeping the kernel
-memory mapped in the user processes. This introduces a considerable performance
-overhead for syscalls. When the kernel memory is not mapped, the speculative
-execution will not load anything into the cache, and the attack will not work.
+Modern operating systems mitigate the Meltdown attack
+by [not keeping the kernel memory mapped in the user
+processes](https://en.wikipedia.org/wiki/Kernel_page-table_isolation). This
+introduces a considerable performance overhead for syscalls. When the kernel
+memory is not mapped, the speculative execution will not load anything into the
+cache, and the attack will not work.
 
 ### Spectre-NG v3a - Rogue System Register Read (RSRR)
 
