@@ -112,7 +112,56 @@ the CPU sees that the memory is not allowed to be read, it will roll back the
 speculatively executed operations and return the CPU registers to the state they
 had before. But it will not roll back the cache states.
 
+There are two typical ways to exploit this vulnerability:
 
+1. _Flush and Reload._ The attacker flushes the CPU cache to ensure that her
+   data is not in the cache, runs the code that depends on the sensitive data
+   inside the kernel, and then measures that access time to her data to see if
+   the sensitive code has accessed her data. For example, the code could look
+   like this:
+
+   ```c
+   int local[10];
+
+   int main(){
+     // …
+     
+     // ← flush the local from CPU cache here
+     
+     // some pointer to kernel memory that we want to read
+     int *ptr = …;
+     
+     // This like will cause SIGSEGV signal, because the CPU does not allow
+     // us to read the *ptr. The SIGSEGV will cause the interrupt handler to
+     // run. For us it will look as if this line did not run, but the CPU will
+     // actually run it and mess with the CPU cache states.
+     int a = local[*ptr];
+   }
+   
+   void interrupt_handler(){
+     // Measure access time to each element of local to determine which element
+     // of local is in the cache. If, say, local[5] is in the cache, then we
+     // know that *ptr == 5.
+   }
+   ```
+
+2. Prime and Probe. This one works similarty, but now instead of flushing we
+   fill the cache with our data, and then run the sensitive code to see if it
+   will displace our data from cache.
+
+   For this type of attack, one must mind the
+   [cache associativity](https://www.sciencedirect.com/topics/computer-science/set-associative-cache).
+   CPUs usually don't allow any cache line from the memory to be stored in any
+   cache block of the CPU, but each cache line has a set of CPU cache blocks
+   where it can be stored (for one- and two-way associative caches these sets
+   have size 1 and 2 respectively). Knowing the cache associativity of the CPU
+   lets the attacker predict which memory accesses of the sensitive code can
+   displace which parts of her own data from the cache.
+
+Modern operating systems mitigate the Meltdown attack by not keeping the kernel
+memory mapped in the user processes. This introduces a considerable performance
+overhead for syscalls. When the kernel memory is not mapped, the speculative
+execution will not load anything into the cache, and the attack will not work.
 
 ### Spectre-NG v3a - Rogue System Register Read (RSRR)
 
