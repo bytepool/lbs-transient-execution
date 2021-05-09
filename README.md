@@ -65,7 +65,54 @@ In general, the exploit must be executed on the same CPU core or thread as the t
 
 ### Spectre v2 - Branch Target Injection (BTI)
 
-### Meltdown v3 - Rogue Data Cache Load (RDCL)
+### Meltdown - Rogue Data Cache Load (RDCL)
+
+When a process running on a multi-user OS (like Linux or Windows) wants to
+read a file or send some data over network, it does so through a _system call_
+(syscall). It puts the syscall parameters into the CPU registers and executes
+a special CPU instruction (`int 0x80` or `sysenter` on x86, `cwc` or `swi`
+on ARM), which triggers a cpu interrupt and starts the interrupt handler in
+the OS code. The interrupt handler runs with kernel privileges, usually it
+can access any memory of any process or talk to any hadware directly—the code
+inside the kernel is trusted. This allows the interrupt handler to serve the
+syscall request from the user process; for example, if the process requested to
+read 10 bytes from some file, the interrupt handler will talk to the HDD, read
+the bytes, and copy them into the buffer inside the process memory. Then the
+interrupt handler restores the CPU to the state where it has been when the user
+process issued the syscall, and continues executing the user process code (after
+dropping the kernel privileges, of course).
+
+In order for the kernel code to work, it needs the kernel memory (its code,
+private data, drivers to work with devices) to be mapped into the address
+space. But we don't want to keep this memory mapped after the interrupt has
+terminated (the user might read kernel data!). We could map and unmap the kernel
+memory at each syscall, but it's too expensive because of the specifics of how
+mapping works. Therefore, operating systems decided to keep it mapped the whole
+time, but disable any access (read, write, execute) to that data via special
+permission bits which are part of the mapping settings. Changing the permission
+bits takes way less time than mapping/unmapping some pages. So the syscall
+handling algorithm looks like this:
+
+1. Set the permission bits to make kernel memory readable, writable, executable
+2. Run the syscall code
+3. Unset the permission bits from step 1
+4. Return execution to the user process who issued syscall
+
+The Meltdown vulnerability takes advantage of the speculative execution and
+caches to read the kernel memory permission, bypassing the permission bits.
+
+If the user process tries to read the kernel memory, this will cause another
+kind of interrupt which basically tells the kernel "this process is reading the
+memory it's not allowed to read", and the kernel may either kill the process
+or send it a signal to notify that it's not allowed to read that memory. Or
+this is how it was supposed to work in theory. In practice, the speculative
+execution manages to perform the memory access to the restricted memory and
+maybe execute a couple of other instructions that come next. Of course, after
+the CPU sees that the memory is not allowed to be read, it will roll back the
+speculatively executed operations and return the CPU registers to the state they
+had before. But it will not roll back the cache states.
+
+
 
 ### Spectre-NG v3a - Rogue System Register Read (RSRR)
 
