@@ -14,9 +14,9 @@ TODO:
 
 ### CPU features for performance optimization
 
-Since memory access is orders of magnitude slower than modern CPUs, CPU manufacturers have come up with clever performance optimizations to effectively use the time while waiting for memory access operations to complete. These performance optimizations include the CPU features discussed in this section, and without these features many tasks run significantly slower, in some cases even 10x slower. However, it also these optimizations that have lead to the vulnerabilities discussed in this report.
+Since memory access is orders of magnitude slower than modern CPUs, CPU manufacturers have come up with clever performance optimizations to effectively use the time while waiting for memory access operations to complete. These performance optimizations include the CPU features discussed in this section, and without these features many tasks run significantly slower, in some cases even 10x slower. However, it is also these optimizations that have lead to the vulnerabilities discussed in this report.
 
-The various Spectre and Meltdown variants in particular rely on out-of-order execution, speculative execution and branch prediction to leak CPU internal information to an attacker. The MDS or RIDL vulnerabilities that were found later additionally rely on various CPU internal buffers to leak secrets across hyperthreads.
+The Spectre and Meltdown variants in particular rely on out-of-order execution, speculative execution and branch prediction to leak CPU internal information to an attacker. The MDS or RIDL vulnerabilities that were found later additionally rely on various CPU internal buffers to leak secrets across CPU threads (called hyperthreads in Intel architectures).
 
 In the following subsections, we will shortly outline what these CPU features do and how they work.
 
@@ -24,7 +24,7 @@ In the following subsections, we will shortly outline what these CPU features do
 
 As programmers, we think of CPU instructions as being executed sequentially, one by one, but in practice instructions can be executed out-of-order, aptly named *out-of-order execution*. This happens when one or more previous instructions are waiting to complete, and the following instructions have no data dependency on the previous instructions. Simply put, if instructions don't need to know any of the resulting values of the previous instructions, they are ready to execute and the CPU will put them in a pipeline.
 
-Note that we specifically qualify the instruction dependency to data dependencies, because control flow dependencies might be ignored if speculative execution is allowed. Speculative execution takes the idea of using the waiting time effectively even further, by allowing the execution of branches without knowing if they will be taken or not, i.e., executing them speculatively. This is where branch prediction comes in: based on previous executions, the CPU guesses which branch will be executed next.
+Note that we specifically qualify the instruction dependency to data dependencies, because control flow dependencies might be ignored if speculative execution is allowed. *Speculative execution* takes the idea of using the waiting time effectively even further, by allowing the execution of branches without knowing if they will be taken or not, i.e., executing them speculatively. This is where *branch prediction* comes in: based on previous executions, the CPU guesses which branch will be executed next.
 The important part is that speculative execution is CPU internal, nothing that is executed speculatively is written back to memory, and if it turns out that a branch was taken in error, the CPU can roll back its internal state to before the branch was taken. However, speculative execution has side-effects such as affecting the CPU caches that are not rolled back, so that some information of the speculated branches can leak through side-channels.
 
 #### Simultaneous Multithreading (SMT) & CPU internal buffers
@@ -42,11 +42,31 @@ TODO: write a description of these buffers.
 
 ### Relevant Cache Side-Channel Attacks
 
+Side-channel attacks do not directly attack the application that is being targeted, instead they derive secret information from side-effects of executing that application. The classic example would be a timing side-channel of a poorly implemented password check: if the password is compared character for character, every character that is guessed correctly increases the time the application needs to return with the answer, so an attacker can determine the characters one by one based on the timing of the applications response.
+
+There are many types of side-channel attacks, but in the context of transient execution vulnerabilities, cache side-channel attacks are the most relevant, so we will explain some of the most important concepts here.
+
+#### Basics of CPU caches
+
+As you are probably aware, most desktop & server CPUs have a three-tiered hierarchy of caches, with each cache level being slightly slower and slightly bigger than the previous one: *L1*, *L2*, *L3*. The L1 cache is also typically split into a data cache (*L1d*) and an instruction cache (*L1i*). For our purposes, it is sufficient to know that any value found in cache is significantly faster to retrieve than any value that has to be fetched from main memory, and the difference in timing is clearly observable when measured.
+
+It is also important to remember that caches are organized into so called *cache lines*, a data row of fixed size. A memory address is typically split into three parts to determine its place in the cache: [*tag* | *index* | *offset*]. A *way* indicates how many cache lines can be stored per cache entry. For example, a 2-way set-associative cache can store 2 cache lines at the same index.
+TODO: determine if this explanation is needed, and if so, elaborate (explain what tag, index and offset are, etc.).
+
 #### Flush+Reload
+
+The basic idea of a flush+reload attack is simple: the attacker uses a CPU instruction such as *clflush* to flush a certain cache line from memory, thus guaranteeing that it is no longer in cache, then triggers the loading of the secret by the target process, and finally the attacker measures the time it takes to reload the flushed cache line. If the access is quick, the attacker knows that the cache line was accessed by the target process since it was flushed.
+
+TODO: Obviously, timing is very important here. How would that work in practice?
 
 #### Evict+Reload
 
-#### ...
+Evict+reload is a variation of the flush+reload attack which does not use the *clflush* instruction and instead evicts the targeted cache line by accessing data that will replace it. So the only difference is that instead of using a CPU instruction to flush the cache line, the cache line is evicted by loading a different cache line in the same location.
+
+
+#### Prime+Probe
+
+In a prime+probe attack, the attacker continously and systematically loads its own known data into every cache line in the cache (that is, accesses every *set* and every *way*) and measures the access time for each cache set, which is known as the priming step. Next, the attacker triggers the target process, which will load new cache lines and evict some of the attackers data from the cache. Now the probe phase works exactly the same way as the prime phase, i.e., every cache line is accessed, and the access time is measured. If the access time for a particular cache set takes longer than before, the attacker knows that the target process accessed that particular cache set.
 
 
 ### Attacker model(s)
@@ -56,7 +76,7 @@ Looking at transient execution vulnerabilities, a relevant question is under whi
 - The secret is loaded into memory by a *target process*, for instance by an ssh server.
 - The attacker can execute an *exploit* that implements a side-channel attack.
 
-In general, the exploit must be executed on the same CPU core or thread as the target process, and in most cases the exploit must also be able to control when the target process loads the secret, for instance by attempting to log into the ssh server.
+In general, the exploit must be executed on the same CPU core or thread as the target process, and in most cases the exploit must also be able to control when the target process loads the secret, for instance by attempting to login to the ssh server.
 
 
 ## Spectre & Meltdown Variants
