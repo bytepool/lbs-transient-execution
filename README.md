@@ -79,11 +79,7 @@ Looking at transient execution vulnerabilities, a relevant question is under whi
 In general, the exploit must be executed on the same CPU core or thread as the victim process, and in most cases the exploit must also be able to control when the victim process loads the secret, for instance by attempting to login to the ssh server.
 
 
-## Spectre & Meltdown Variants
-
-### Spectre v1 - Bounds Check Bypass (BCB)
-
-### Spectre v2 - Branch Target Injection (BTI)
+## Meltdown & Spectre Variants
 
 ### Meltdown - Rogue Data Cache Load (RDCL)
 
@@ -178,12 +174,86 @@ There are two typical ways to exploit this vulnerability:
    lets the attacker predict which memory accesses of the sensitive code can
    displace which parts of her own data from the cache.
 
-Modern operating systems mitigate the Meltdown attack
-by [not keeping the kernel memory mapped in the user
+Modern operating systems mitigate the Meltdown attack by [not keeping the
+kernel memory mapped in the user
 processes](https://en.wikipedia.org/wiki/Kernel_page-table_isolation). This
 introduces a considerable performance overhead for syscalls. When the kernel
 memory is not mapped, the speculative execution will not load anything into the
 cache, and the attack will not work.
+
+### Spectre v1 - Bounds Check Bypass (BCB)
+
+Similarly to Meltdown, Spectre v1 also relies on the CPU cache and speculative
+execution. But in addition to that it also exploits the branch prediction
+mechanism.
+
+Imagine that the OS kernel (or another code running on a higher privilege
+level) runs this piece of code (adapted from [Linaro
+blog](https://www.linaro.org/blog/meltdown-spectre/)):
+
+```c
+if (x < array1_size)
+    y = array2[array1[x]]
+```
+
+If all the values in `array2` are valid indices to address `array1`, this code
+normally should be safe; even if the adversary can choose an arbitrary values
+of `x` as an input.
+
+When the `x` is not in CPU cache during the execution of the above snippet,
+the comparison will take time to load the value into the cache. But this won't
+stop the speculative execution, it will try to keep running the code. But what
+code? The `if` body or the code after it? The CPU will ask its branch predictor
+to decide, and the latter will answer based on how often the `if` body was
+executed in the past.
+
+So if the adversary is sure that the branch predictor will advice the CPU to
+run the `if` body, she can pass such value for `x` that `array1 + x` address
+points to memory she's interested in. And it will cause a memory access to
+`array2 + *(array1 + x)`, which the attacker can detect using the standard
+Meltdown techniques; both "Prime and Probe" and "Flush and Reload" can work.
+
+This attack, if successfully implemented, can target pretty much any piece
+of code that is running with higher privileges: OS kernel, virtualization
+hypervisor, your programming language VM (Java, JS). But, in practice, this
+attack is considered to be very difficult to implement: guessing what branch
+predictor will do and looking for the right piece of code in the target program
+both add a lot of complexity. The Spectre v2 improves this attack with a better
+way to deal with branch predictor, making it a lot more practical.
+
+### Spectre v2 - Branch Target Injection (BTI)
+
+The branch predictor keeps track of how many times each branch was taken. But,
+of course, it would be impossible to have a counter inside CPU for each
+location in RAM which can have a branch in it (modern computers can have tens
+of gigabytes of memory; if you want a counter for each memory location, you
+will have to have a few gigabytes of memory in your CPU branch predictor).
+
+Therefore, branch predictor accumulates the statistics for multiple branches
+in one counter. The mapping there is similar to the mapping of set associative
+cache, no separation is enforced between different privilege levels.
+
+It means, that an attacker can create some branches in her memory that will
+share branch predictor counters with the target code, and then run those
+branches multiple times to bias the counters (this is the "injection" part) in
+the needed direction. This way, the attacker can ensure that the needed branch
+will be taken by the target code from Spectre v1.
+
+The possibility of this attack comes from the fact that branch predictor
+counters are shared between different privilege levels. Modern processors
+provide no way of isolating them or manually clearing the branch
+predictor counters. While everyone is wating for CPU manufacturers
+to design new processors will will have these issues addressed,
+engineers from Google proposed a completely software mitigation called
+[retpolines](https://support.google.com/faqs/answer/7625886) (return +
+trampoline).
+
+Retpoline technique shows how to replace any branching instruction by a few
+other instructions which will behave the same and at the same time confuse
+that branch predictor and not let it see that this is a branch. This fools the
+speculative execution which thinks that some useless code (like infinite cycle)
+is going to be executed next, while in reality control flow gets redirected
+somewhere else.
 
 ### Spectre-NG v3a - Rogue System Register Read (RSRR)
 
