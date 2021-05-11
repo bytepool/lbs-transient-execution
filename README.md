@@ -55,28 +55,28 @@ TODO: determine if this explanation is needed, and if so, elaborate (explain wha
 
 #### Flush+Reload
 
-The basic idea of a flush+reload attack is simple: the attacker uses a CPU instruction such as *clflush* to flush a certain cache line from memory, thus guaranteeing that it is no longer in cache, then triggers the loading of the secret by the target process, and finally the attacker measures the time it takes to reload the flushed cache line. If the access is quick, the attacker knows that the cache line was accessed by the target process since it was flushed.
+The basic idea of a flush+reload attack is simple: the attacker identifies a specific shared memory location they want to monitor, for instance a specific line of code in a shared library, and uses the CPU instruction *clflush* to flush the corresponding cache line from memory, thus guaranteeing that it is no longer in cache. The attacker triggers the loading of the secret by the victim process, and finally they measure the time it takes to reload the flushed cache line. If the access is quick, the attacker knows that the cache line was accessed by the victim process since it was flushed.
 
-TODO: Obviously, timing is very important here. How would that work in practice?
+TODO: Obviously, timing is very important here. How would this work in practice?
 
 #### Evict+Reload
 
-Evict+reload is a variation of the flush+reload attack which does not use the *clflush* instruction and instead evicts the targeted cache line by accessing data that will replace it. So the only difference is that instead of using a CPU instruction to flush the cache line, the cache line is evicted by loading a different cache line in the same location.
+Evict+reload is a variation of the flush+reload attack which does not use the *clflush* instruction and instead evicts the targeted cache line by accessing data that will replace it. So the main difference is that instead of using a CPU instruction to flush the cache line, the cache line is evicted by loading a different cache line in the same location. This is especially useful when an attacker does not have access to a flush instruction, for instance when performing attacks in a browser.
 
 
 #### Prime+Probe
 
-In a prime+probe attack, the attacker continously and systematically loads its own known data into every cache line in the cache (that is, accesses every *set* and every *way*) and measures the access time for each cache set, which is known as the priming step. Next, the attacker triggers the target process, which will load new cache lines and evict some of the attackers data from the cache. Now the probe phase works exactly the same way as the prime phase, i.e., every cache line is accessed, and the access time is measured. If the access time for a particular cache set takes longer than before, the attacker knows that the target process accessed that particular cache set.
+In a prime+probe attack, the attacker continously and systematically loads its own known data into every cache line in the cache (that is, accesses every *set* and every *way*) and measures the access time for each cache set, which is known as the priming step. Next, the attacker triggers the victim process, which will load new cache lines and evict some of the attackers data from the cache. Now the probe phase works exactly the same way as the prime phase, i.e., every cache line is accessed, and the access time is measured. If the access time for a particular cache set takes longer than before, the attacker knows that the victim process accessed that particular cache set.
 
 
 ### Attacker model(s)
 
 Looking at transient execution vulnerabilities, a relevant question is under which circumstances they can be exploited. Let us establish some terminology first:
 - There is a *secret* which the *attacker* wants to leak, for instance the root password hash stored in /etc/shadow.
-- The secret is loaded into memory by a *target process*, for instance by an ssh server.
+- The secret is loaded into memory by a *victim process*, for instance by an ssh server.
 - The attacker can execute an *exploit* that implements a side-channel attack.
 
-In general, the exploit must be executed on the same CPU core or thread as the target process, and in most cases the exploit must also be able to control when the target process loads the secret, for instance by attempting to login to the ssh server.
+In general, the exploit must be executed on the same CPU core or thread as the victim process, and in most cases the exploit must also be able to control when the victim process loads the secret, for instance by attempting to login to the ssh server.
 
 
 ## Spectre & Meltdown Variants
@@ -209,22 +209,32 @@ cache, and the attack will not work.
 
 ## Microarchitectural Data Sampling
 
-### RIDL - Zombieload - Microarchitectural Fill Buffer Data Sampling (MFBDS)
+In this section, we discuss a new class of transient execution vulnerabilities which were named "microarchitectural data sampling (MDS)" by Intel. Different variations of vulnerabilities in this class have been named "Zombieload" or "rogue in-flight data load (RIDL)" by different groups of researchers who discovered them.
 
-### RIDL - Microarchitectural Load Port Data Sampling (MLPDS)
+Unlike spectre and meltdown, MDS vulnerabilities do not use specific memory addresses to leak data, but instead use clever techniques to leak data that is being held in various Intel CPU internal buffers. This means that the attacker has limited control over which data is leaked and therefore needs to do additional filtering of the leaked data to find the information they are after. On the other hand, it is harder to mitigate these vulnerabilities.
 
-### RIDL - Microarchitectural Data Sampling Uncacheable memory (MDSUM)
-
-### RIDL - Fallout - Microarchitectural Store Buffer Data Sampling (MSBDS)
-
-### RIDL - Zombieload v2 - Transactional Asynchronous Abort (TAA)
-
-### RIDL - CacheOut - L1D Eviction Sampling (L1DES)
-
-### RIDL - Vector Register Sampling (VRS)
-
-### CROSSTalk - Special Register Buffer Data Sampling (SRBDS)
+Since the buffers and related speculative behavior are unique to Intel architectures, these vulnerabilities do not seem to work directly on other microarchitectures.
 
 
-## Load-Value Injection
+### Microarchitectural Fill Buffer Data Sampling (MFBDS) / Zombieload / RIDL
+
+As described in the introduction above, on Intel architectures the line fill buffer (LFB) is, among other things, used to temporarily store memory addresses that were not found in cache and are therefore being fetched from memory. This increases performance because several addresses can be requested to be fetched from memory at the same time without having to wait for the result. In some cases, data may already be available in the LFB, and the CPU will speculatively load the data and continue to execute, even though the data may be completely unrelated to the requested data. As you might expect after reading about specter and meltdown, this can be exploited by a clever attacker.
+
+
+### Microarchitectural Load Port Data Sampling (MLPDS) / RIDL
+
+### Microarchitectural Store Buffer Data Sampling (MSBDS) / Fallout
+
+### Microarchitectural Data Sampling Uncacheable memory (MDSUM)
+
+### Transactional Asynchronous Abort (TAA) / Zombieload v2 / RIDL
+
+### L1D Eviction Sampling (L1DES) / RIDL / CacheOut
+
+### Vector Register Sampling (VRS) / RIDL
+
+### Special Register Buffer Data Sampling (SRBDS) / CROSSTalk
+
+
+## Load-Value Injection (LVI)
 
