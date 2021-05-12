@@ -313,9 +313,47 @@ somewhere else.
 
 ### Microarchitectural Fill Buffer Data Sampling (MFBDS) / Zombieload / RIDL
 
-In the following, we focus on the first variant which uses the line fill buffer (LFB) to leak data.
+In the following, we focus on the first variant of MDS which uses the line fill buffer (LFB) to leak data. On Intel architectures the line fill buffer (LFB) is, among other things, used to temporarily store memory addresses that were not found in cache and are therefore being fetched from memory. This increases performance because several addresses can be requested to be fetched from memory at the same time without having to wait for the result. In some cases, data may already be available in the LFB, and the CPU will speculatively load the data and continue to execute, even though the data may be completely unrelated to the requested data. As you might expect after reading about specter and meltdown, this can be exploited by a clever attacker.
 
-On Intel architectures the line fill buffer (LFB) is, among other things, used to temporarily store memory addresses that were not found in cache and are therefore being fetched from memory. This increases performance because several addresses can be requested to be fetched from memory at the same time without having to wait for the result. In some cases, data may already be available in the LFB, and the CPU will speculatively load the data and continue to execute, even though the data may be completely unrelated to the requested data. As you might expect after reading about specter and meltdown, this can be exploited by a clever attacker.
+This vulnerability was discovered independently by several groups of researchers which lead to several papers, including Zombieload [1] and RIDL [2]. We will use the example from the RIDL [2] paper to explain the concept further:
+
+```c
+	/* Flush buffer entries */
+	for ( k = 0; k < 256; ++k)
+		flush(buffer + k * 1024)
+	
+	/* Speculatively load the secret. */
+	char value = *(new_page);
+	
+	/* Calculate the corresponding entry. */
+	char *entry_ptr = buffer + (1024 * value)
+	
+	/* Load that entry into the cache. */
+	*(entry_ptr);
+	
+	/* Time the reload of each buffer entry to see which entry is now cached. */
+	for (k = 0; k < 256; ++k) {
+		t0 = cycles();
+		*(buffer + 1024 * k)
+		dt = cycles() - t0;
+		
+		if (dt < 100)
+			++results[k];
+	}
+```
+
+You will notice that this looks a lot like any other flush+reload cache side-channel for other speculative execution vulnerabilities. First you flush the cache, then you speculatively load some data, request a dependent cache entry, and finally you reload the cache to see which cache entry has been loaded so that you can infer the secret value from the cache index. The real magic happens in a single line:
+```c
+	char value = *(new_page);
+```
+In this example, demand paging is used, an OS feature that loads pages when they are needed and not before. Note that the requested *new_page* in this example is a valid page that the process has access to. As the CPU sends the request for *new_page* to be paged in, it will allocate a new LFB entry for it. However, the LFB entry has not been filled with the correct data yet, so there is stale data from previous requests in the buffer, and as the CPU speculatively executes the next line which uses the value from *new_page*, it will use the stale value that is still stored in the LFB entry, thus dereferencing a potentially completely unrelated address that is potentially from another security domain. Of course, as the correct value for *new_page* arrives, the CPU will realize that it used the wrong value and roll back the execution, but at this point the cache has already been altered and the value can be leaked! The actual details of how the LFB works are a bit more complex, but for our purposes it will suffice. If you want to know more, please see the original research papers [1,2].
+
+There are different ways of reliably triggering this vulnerability, for instance using Intel's transactional syncrhonization extensions (TSX), but demand paging is the most interesting one because as a fundamental OS feature it even works in a browser.
+
+The astute reader will have noticed that we leaked a stale value, but we had no control over which value was leaked. Therefore, careful syncrhonization with the victim process is needed in order for an attack to succeed. Also, additional filtering is needed in order to identify relevant pieces of data from irrelevent pieces.
+
+[1] https://zombieloadattack.com/ <br>
+[2] https://mdsattacks.com/
 
 
 ### MFBDS PoC: leaking the ssh host key
