@@ -152,7 +152,10 @@ The following variants of this vulnerability have been assigned a CVE:
 
 ### Load-Value Injection (LVI)
 
-TODO: Write a high level description here.
+Load-Value Injection (LVI) is one of the latest transient execution vulnerabilities [1]. They wondered if it is possible to turn the findings of Meltdown around: is it possible to inject poisoned data into the speculative execution of a victim? It turns out that that is possible, and by cleverly injecting poisoned data to hijack the control flow of the victim's speculative execution, it is possible to leak secrets of the victim!
+
+[1] https://lviattack.eu/lvi.pdf
+
 
 ## Case Studies
 
@@ -381,8 +384,10 @@ There are different ways of reliably triggering this vulnerability, for instance
 
 The astute reader will have noticed that we leaked a stale value, but we had no control over which value was leaked. Therefore, careful syncrhonization with the victim process is needed in order for an attack to succeed. Also, additional filtering is needed in order to identify relevant pieces of data from irrelevent pieces.
 
-[1] https://zombieloadattack.com/ <br>
-[2] https://mdsattacks.com/
+TODO: Explain synchronization & filtering here.
+
+[1] https://zombieloadattack.com/zombieload.pdf <br>
+[2] https://mdsattacks.com/files/ridl.pdf
 
 
 ### MFBDS PoC: leaking the ssh host key
