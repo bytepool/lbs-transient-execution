@@ -1,4 +1,4 @@
-# An Overview of Transient Execution Vulnerabilities
+# A Case Study of Transient Execution Vulnerabilities
 
 ## Introduction & Background
 
@@ -33,7 +33,7 @@ Another speed optimization that CPU manufacturers introduced to modern architect
 
 TODO: write a description of these buffers.
 
-- Fill buffer.
+- Line Fill buffer.
 - Store buffer.
 - Load port buffer.
 - Uncacheable memory.
@@ -78,10 +78,70 @@ Looking at transient execution vulnerabilities, a relevant question is under whi
 
 In general, the exploit must be executed on the same CPU core or thread as the victim process, and in most cases the exploit must also be able to control when the victim process loads the secret, for instance by attempting to login to the ssh server.
 
+## Known transient execution vulnerabilities
 
-## Meltdown & Spectre Variants
+In this section, we briefly outline the different types of transient execution vulnerabilities that have been found so far, before we dive deeper into a small selection of them later.
 
-### Meltdown - Rogue Data Cache Load (RDCL)
+### Spectre & Meltdown Variants
+
+TODO: short high level description of Spectre & Meltdown here.
+
+- Spectre v1 - Bounds Check Bypass (BCB)
+- Spectre v2 - Branch Target Injection (BTI)
+- Meltdown - Rogue Data Cache Load (RDCL)
+- Spectre-NG v3a - Rogue System Register Read (RSRR)
+- Spectre-NG - Lazy FP State Restore
+- Spectre-NG v1.1 - Bounds Check Bypass Store (BCBS)
+- Spectre-NG v4 - Speculative Store Bypass (SSB)
+- SpectreRSB - Return Mispredict
+- Spectre SWAPGS
+
+### Foreshadow - L1 Terminal Fault
+
+TODO: short high level description of L1TF here.
+
+The following variants of this vulnerability have been assigned a CVE:
+
+- Foreshadow
+- Foreshadow-OS
+- Foreshadow-VMM
+
+
+### Microarchitectural Data Sampling
+
+In this section, we discuss a new class of transient execution vulnerabilities which were named "microarchitectural data sampling (MDS)" by Intel. Different variations of vulnerabilities in this class have been named "Zombieload" or "rogue in-flight data load (RIDL)" by different groups of researchers who discovered them.
+
+Unlike spectre and meltdown, MDS vulnerabilities do not use specific memory addresses to leak data, but instead use clever techniques to leak data that is being held in various Intel CPU internal buffers. This means that the attacker has limited control over which data is leaked and therefore needs to do additional filtering of the leaked data to find the information they are after. On the other hand, it is harder to mitigate these vulnerabilities.
+
+Since the buffers and related speculative behavior are unique to Intel architectures, these vulnerabilities do not seem to work directly on other microarchitectures.
+
+The following variants of this vulnerability have been assigned a CVE:
+
+- Microarchitectural Fill Buffer Data Sampling (MFBDS) / Zombieload / RIDL
+- Microarchitectural Load Port Data Sampling (MLPDS) / RIDL
+- Microarchitectural Store Buffer Data Sampling (MSBDS) / Fallout
+- Microarchitectural Data Sampling Uncacheable memory (MDSUM)
+- Transactional Asynchronous Abort (TAA) / Zombieload v2 / RIDL
+- L1D Eviction Sampling (L1DES) / RIDL / CacheOut
+- Vector Register Sampling (VRS) / RIDL
+- Special Register Buffer Data Sampling (SRBDS) / CROSSTalk
+
+
+### Load-Value Injection (LVI)
+
+
+## Case Studies
+
+In this section we discuss a subset of the different variants highlighted above in more detail. The chosen vulnerabilities are:
+
+- Meltdown & Spectre (v1 - v3)
+- Microarchitectural Fill Buffer Data Sampling (MFBDS) / Zombieload / RIDL
+
+In addition, we adapt some known proof of concepts and apply them to new victim applications. We also look into possible mitigations.
+
+### Meltdown & Spectre
+
+#### Meltdown - Rogue Data Cache Load (RDCL)
 
 When a process running on a multi-user OS (like Linux or Windows) wants to
 read a file or send some data over network, it does so through a _system call_
@@ -181,7 +241,7 @@ introduces a considerable performance overhead for syscalls. When the kernel
 memory is not mapped, the speculative execution will not load anything into the
 cache, and the attack will not work.
 
-### Spectre v1 - Bounds Check Bypass (BCB)
+#### Spectre v1 - Bounds Check Bypass (BCB)
 
 Similarly to Meltdown, Spectre v1 also relies on the CPU cache and speculative
 execution. But in addition to that it also exploits the branch prediction
@@ -221,7 +281,7 @@ predictor will do and looking for the right piece of code in the target program
 both add a lot of complexity. The Spectre v2 improves this attack with a better
 way to deal with branch predictor, making it a lot more practical.
 
-### Spectre v2 - Branch Target Injection (BTI)
+#### Spectre v2 - Branch Target Injection (BTI)
 
 The branch predictor keeps track of how many times each branch was taken. But,
 of course, it would be impossible to have a counter inside CPU for each
@@ -255,56 +315,12 @@ speculative execution which thinks that some useless code (like infinite cycle)
 is going to be executed next, while in reality control flow gets redirected
 somewhere else.
 
-### Spectre-NG v3a - Rogue System Register Read (RSRR)
-
-### Spectre-NG - Lazy FP State Restore
-
-### Spectre-NG v1.1 - Bounds Check Bypass Store (BCBS)
-
-### Spectre-NG v4 - Speculative Store Bypass (SSB)
-
-### SpectreRSB - Return Mispredict
-
-### Spectre SWAPGS
-
-
-## Foreshadow - L1 Terminal Fault
-
-### Foreshadow
-
-### Foreshadow-OS
-
-### Foreshadow-VMM
-
-
-## Microarchitectural Data Sampling
-
-In this section, we discuss a new class of transient execution vulnerabilities which were named "microarchitectural data sampling (MDS)" by Intel. Different variations of vulnerabilities in this class have been named "Zombieload" or "rogue in-flight data load (RIDL)" by different groups of researchers who discovered them.
-
-Unlike spectre and meltdown, MDS vulnerabilities do not use specific memory addresses to leak data, but instead use clever techniques to leak data that is being held in various Intel CPU internal buffers. This means that the attacker has limited control over which data is leaked and therefore needs to do additional filtering of the leaked data to find the information they are after. On the other hand, it is harder to mitigate these vulnerabilities.
-
-Since the buffers and related speculative behavior are unique to Intel architectures, these vulnerabilities do not seem to work directly on other microarchitectures.
-
 
 ### Microarchitectural Fill Buffer Data Sampling (MFBDS) / Zombieload / RIDL
 
-As described in the introduction above, on Intel architectures the line fill buffer (LFB) is, among other things, used to temporarily store memory addresses that were not found in cache and are therefore being fetched from memory. This increases performance because several addresses can be requested to be fetched from memory at the same time without having to wait for the result. In some cases, data may already be available in the LFB, and the CPU will speculatively load the data and continue to execute, even though the data may be completely unrelated to the requested data. As you might expect after reading about specter and meltdown, this can be exploited by a clever attacker.
+In the following, we focus on the first variant which uses the line fill buffer (LFB) to leak data.
+
+On Intel architectures the line fill buffer (LFB) is, among other things, used to temporarily store memory addresses that were not found in cache and are therefore being fetched from memory. This increases performance because several addresses can be requested to be fetched from memory at the same time without having to wait for the result. In some cases, data may already be available in the LFB, and the CPU will speculatively load the data and continue to execute, even though the data may be completely unrelated to the requested data. As you might expect after reading about specter and meltdown, this can be exploited by a clever attacker.
 
 
-### Microarchitectural Load Port Data Sampling (MLPDS) / RIDL
-
-### Microarchitectural Store Buffer Data Sampling (MSBDS) / Fallout
-
-### Microarchitectural Data Sampling Uncacheable memory (MDSUM)
-
-### Transactional Asynchronous Abort (TAA) / Zombieload v2 / RIDL
-
-### L1D Eviction Sampling (L1DES) / RIDL / CacheOut
-
-### Vector Register Sampling (VRS) / RIDL
-
-### Special Register Buffer Data Sampling (SRBDS) / CROSSTalk
-
-
-## Load-Value Injection (LVI)
-
+### MFBDS PoC: leaking the ssh host key
