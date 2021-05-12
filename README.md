@@ -105,7 +105,19 @@ others for completeness.
 
 ### Foreshadow - L1 Terminal Fault
 
-TODO: short high level description of L1TF here.
+The initial Foreshadow attack was designed to bypass the [Intel
+SGX](https://en.wikipedia.org/wiki/Software_Guard_Extensions) (Software Guard
+eXtensions). Intel SGX provides a private execution environment, where a
+userspace applicaiton can keep its secret data (anything form Cryptographic
+keys to DRM authentication data) and work with it, without allowing even a more
+privileged code, like OS kernel, to access the private data. The attack relied
+on the speculative execution. The later Foreshadow-OS and Foreshadow-VM attacks
+elevated the Foreshadow technique to read memory which the process normally is
+not authorized to read. Foreshadow-OS abuses certain features of page mapping
+mechanism, and Foreshadow-VM allows reading values that other code has loaded
+into L1 cache. The latter means that the attacker can potentially read some
+data that belongs to a process running in another VM, if the two VMs share a
+CPU core.
 
 The following variants of this vulnerability have been assigned a CVE:
 
