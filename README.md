@@ -79,11 +79,23 @@ In this section, we briefly outline the different types of transient execution v
 
 ### Spectre & Meltdown Variants
 
-TODO: short high level description of Spectre & Meltdown here.
+Meltdown and Spectre allow bypassing the standard OS and VM privilege
+separation mechanisms. They do so by exploiting CPU cache, speculative
+execution and branch prediction. Meltdown is especially tailored to exploit a
+specific implementation of OS kernel context switching, which was already fixed
+in modern OSes. Spectre, unlike Meltdown, is more versatile and can be used to
+bypass both OS and VM boundaries (including JavaScript VM in browsers). Its v1
+version merely passively exploits the branch predictor, and Spectre v2 proposes
+a technique to actively poison the branch predictor data and make the target
+code do branch predictions in a certain, useful to the adversary, way.
 
+Below is the list of vulnerabilities of this kind. We focus on the first three
+and describe them in detail in the following sections, and we only mention the
+others for completeness.
+
+- Meltdown - Rogue Data Cache Load (RDCL)
 - Spectre v1 - Bounds Check Bypass (BCB)
 - Spectre v2 - Branch Target Injection (BTI)
-- Meltdown - Rogue Data Cache Load (RDCL)
 - Spectre-NG v3a - Rogue System Register Read (RSRR)
 - Spectre-NG - Lazy FP State Restore
 - Spectre-NG v1.1 - Bounds Check Bypass Store (BCBS)
