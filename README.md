@@ -6,11 +6,7 @@ With the discovery of Spectre and Meltdown in 2017, a new class of vulnerabiliti
 
 In addition to the different Spectre and Meltdown variants, another class of transient execution vulnerabilities was found later, commonly known as microarchitectural data sampling (MDS) or rogue in-flight data load (RIDL). These use various CPU internal buffers to leak data.
 
-In this work, we attempt to give an overview of the different transient execution vulnerabilities that have been found since 2017, including a brief description of the CPU features that are being exploited and the attacker model that is assumed.
-
-TODO:
-- Add sentence on the different archs that we look at (ARM64).
-- Add sentence on the PoCs.
+In this work, we attempt to give an overview of the different transient execution vulnerabilities that have been found since 2017, including a brief description of the CPU features that are being exploited and the attacker model that is assumed. We also develop Proof of Concept programs that demonstrate some aspects of the vulnerabilities in a new setting or for new applications. We focus on Intel (i7, i5) processors and ARM Cortex-A53, because these are the CPUs we have at hand.
 
 ### CPU features for performance optimization
 
@@ -50,14 +46,13 @@ There are many types of side-channel attacks, but in the context of transient ex
 
 As you are probably aware, most desktop & server CPUs have a three-tiered hierarchy of caches, with each cache level being slightly slower and slightly bigger than the previous one: *L1*, *L2*, *L3*. The L1 cache is also typically split into a data cache (*L1d*) and an instruction cache (*L1i*). For our purposes, it is sufficient to know that any value found in cache is significantly faster to retrieve than any value that has to be fetched from main memory, and the difference in timing is clearly observable when measured.
 
-It is also important to remember that caches are organized into so called *cache lines*, a data row of fixed size. A memory address is typically split into three parts to determine its place in the cache: [*tag* | *index* | *offset*]. A *way* indicates how many cache lines can be stored per cache entry. For example, a 2-way set-associative cache can store 2 cache lines at the same index.
-TODO: determine if this explanation is needed, and if so, elaborate (explain what tag, index and offset are, etc.).
+It is also important to remember that caches are organized into so called *cache lines*, a data row of fixed size. A memory address is typically split into three parts to determine its place in the cache: [*tag* | *index* | *offset*]. A *way* is the CPU parameter that indicates how many cache lines can be stored per cache entry. For example, a 2-way set-associative cache can store 2 cache lines at the same index.
 
 #### Flush+Reload
 
 The basic idea of a flush+reload attack is simple: the attacker identifies a specific shared memory location they want to monitor, for instance a specific line of code in a shared library, and uses the CPU instruction *clflush* to flush the corresponding cache line from memory, thus guaranteeing that it is no longer in cache. The attacker triggers the loading of the secret by the victim process, and finally they measure the time it takes to reload the flushed cache line. If the access is quick, the attacker knows that the cache line was accessed by the victim process since it was flushed.
 
-TODO: Obviously, timing is very important here. How would this work in practice?
+Some of the modern processors provide a very precise way to measure the execution time. For example on x86 there is `rdtsc` instruction. On ARM getting precise time measurements [can be more challenging](https://www.virusbulletin.com/virusbulletin/2018/07/does-malware-based-spectre-exist/#h3-challenges-armv7-poc), and the attacker might need to put some extra effort and, e.g. create its own timer by running a counter process in another thread. The precision of such timers is affected by events like context switches and hardware interrupts. When possible, the attacker can ask the OS scheduler to disttribute its process and the victim process in a certain way between the CPU cores (but this measure makes more sense for PoC code than for a real attack).
 
 #### Evict+Reload
 
