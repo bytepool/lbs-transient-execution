@@ -397,3 +397,7 @@ The proof of concept (PoC) from the RIDL paper [1] leaked the root password hash
 TODO: adapt PoC and point to code and results here.
 
 [1] https://mdsattacks.com/files/ridl.pdf
+
+### Retpolines PoC: demonstrating a protection against branch prediction vulnerabilities
+
+[retpolines](https://support.google.com/faqs/answer/7625886)
