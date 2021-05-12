@@ -25,15 +25,19 @@ The important part is that speculative execution is CPU internal, nothing that i
 
 #### Simultaneous Multithreading (SMT) & CPU internal buffers
 
-Another speed optimization that CPU manufacturers introduced to modern architectures is so called *simultaneous multithreading (SMT)*, which makes a single CPU core look like multiple CPUs to the operating system because this allows additional CPU internal optimizations. Intel's implementation of SMT is called *Hyper-Threading Technology (HTT)*. Threads share certain internal resources, such as caches and buffers, which makes it possible for information to leak from one thread to another through side-channels that use the shared resources. In this section we will only highlight a few specific buffers that have been used in MDS/RIDL to date.
+Another speed optimization that CPU manufacturers introduced to modern architectures is so called *simultaneous multithreading (SMT)*, which makes a single CPU core look like multiple CPUs to the operating system because this allows additional CPU internal optimizations. Intel's implementation of SMT is called *Hyper-Threading Technology (HTT)*. Threads share certain internal resources, such as caches and buffers, which makes it possible for information to leak from one thread to another through side-channels that use the shared resources.
 
-TODO: write a description of these buffers.
+On Intel architectures, there is a buffer called the *Line Fill Buffer (LFB)*, which is a central component in most load and store operations. In the following we briefly look at what the *Line Fill Buffer (LFB)* is and what it does, because this is necessary background to understand the related MFBDS vulnerability which we explain in some detail later. There are also other interesting buffers in use on Intel architectures which are used in similar vulnerabilities, such as the *store & forward buffer* and the *load port buffer*, but we focus only on the LFB here.
 
-- Line Fill buffer.
-- Store buffer.
-- Load port buffer.
-- Uncacheable memory.
-- ?
+The line fill buffer (LFB) is, among other things, used to temporarily store memory addresses that were not found in cache and are therefore being fetched from memory. This increases performance because several addresses can be requested to be fetched from memory at the same time without having to wait for the result. According to [1], the LFB has a number of additional tasks:
+
+- Load squashing. If there are several outstanding requests to the same address, the LFB will point to the same LFB entry without allocating a new one.
+- Write combining. If several writes are recorded to the same address, the LFB will combine them before passing them on to the higher memory levels.
+- Non-temporal requests. If memory is not supposed to be cached, load and store operations will be run exclusively through the LFB.
+
+Note that the LFB and other buffers mentioned here are unique to Intel microarchitectures.
+
+[1] https://mdsattacks.com/files/ridl.pdf
 
 
 ### Relevant Cache Side-Channel Attacks
@@ -136,6 +140,7 @@ The following variants of this vulnerability have been assigned a CVE:
 
 ### Load-Value Injection (LVI)
 
+TODO: Write a high level description here.
 
 ## Case Studies
 
