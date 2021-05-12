@@ -386,3 +386,9 @@ The astute reader will have noticed that we leaked a stale value, but we had no 
 
 
 ### MFBDS PoC: leaking the ssh host key
+
+The proof of concept (PoC) from the RIDL paper [1] leaked the root password hash from the /etc/shadow file. We adapt their PoC in order to instead leak the private key of the ssh server (/etc/ssh/ssh_host_ecdsa_key), so that the attacker can impersonate the ssh server.
+
+TODO: adapt PoC and point to code and results here.
+
+[1] https://mdsattacks.com/files/ridl.pdf
