@@ -400,4 +400,12 @@ TODO: adapt PoC and point to code and results here.
 
 ### Retpolines PoC: demonstrating a protection against branch prediction vulnerabilities
 
-[retpolines](https://support.google.com/faqs/answer/7625886)
+[Retpolines](https://support.google.com/faqs/answer/7625886) offer a way to
+replace each jump (which is affected by branch prediction) by a special gadget
+which does the same, but fools branch predictor and doesn't let it see where
+the jump is happening.
+
+It's a beautiful technique, it will be interesting to investigate whether it
+really protects against attacks like Spectre, and to see how much overhead
+it brings. For this PoC we will write a toy example which will be vulnerable
+against Spectre, modify it to use retpolines, and compare the two.
