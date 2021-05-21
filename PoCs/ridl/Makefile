@@ -1,6 +1,7 @@
 CORES=3,7
 
-all: cross_transaction_leak verw_bypass alignment_write ridl_basic ridl_invalidpage taa_basic taa_read pgtable_leak pgtable_leak_notsx loadport verw_bypass_l1des vrs cpuid_leak_taa cpuid_leak
+#all: cross_transaction_leak verw_bypass alignment_write ridl_basic ridl_invalidpage taa_basic taa_read pgtable_leak pgtable_leak_notsx loadport verw_bypass_l1des vrs cpuid_leak_taa cpuid_leak
+all: loadport
 
 clean:
 	rm cross_transaction_leak verw_bypass alignment_write ridl_basic ridl_invalidpage taa_basic taa_read pgtable_leak pgtable_leak_notsx loadport verw_bypass_l1des vrs cpuid_leak_taa cpuid_leak

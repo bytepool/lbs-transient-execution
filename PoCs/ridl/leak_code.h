@@ -30,7 +30,9 @@ static inline __attribute__((always_inline)) void speculate_leak_normal(unsigned
 	"retq\n"
 	// actual return point
 	"1:\n"
-	::"r"(leak), "r"(reloadbuffer):"rax"
+	:
+	:"r" (leak), "r" (reloadbuffer)
+	:"rax"
 	);
 }
 
@@ -68,7 +70,9 @@ static inline __attribute__((always_inline)) void speculate_leak_clflush(unsigne
 	"retq\n"
 	// actual return point
 	"1:\n"
-	::"r"(leak), "r"(reloadbuffer),"r"(to_flush):"rax"
+	:
+	:"r" (leak), "r" (reloadbuffer), "r" (to_flush)
+	:"rax"
 	);
 }
 
@@ -88,7 +92,9 @@ static inline __attribute__((always_inline)) void tsxabort_leak_clflush(unsigned
 	"movzbq (%%rax, %1), %%rax\n"
 	"xend\n"
 	"1:\n"
-	::"r"(leak), "r"(reloadbuffer), "r"(flushbuffer):"rax"
+	:
+	:"r" (leak), "r" (reloadbuffer), "r"(flushbuffer)
+	:"rax"
 	);
 }
 
@@ -110,7 +116,9 @@ static inline __attribute__((always_inline)) void tsxabort_leak_clflush_shifted(
 	"movzbq (%%rax, %1), %%rax\n"
 	"xend\n"
 	"1:\n"
-	::"r"(leak), "r"(reloadbuffer), "r"(flushbuffer), "c"(shift):"rax","xmm0"
+	:
+	:"r" (leak), "r" (reloadbuffer), "r" (flushbuffer), "c"(shift)
+	:"rax","xmm0"
 	);
 }
 
@@ -127,7 +135,9 @@ static inline __attribute__((always_inline)) void tsxabort_leak_bareconflict(uns
 	"movzbq (%%rax, %1), %%rax\n"
 	"xend\n"
 	"1:\n"
-	::"r"(leak), "r"(reloadbuffer), "r"(flushbuffer):"rax"
+	:
+	:"r"(leak), "r"(reloadbuffer), "r"(flushbuffer)
+	:"rax"
 	);
 }
 
@@ -140,7 +150,9 @@ static inline __attribute__((always_inline)) void tsx_leak_read_normal(unsigned 
 	"movzbq (%%rax, %1), %%rax\n"
 	"xend\n"
 	"1:\n"
-	::"r"(leak), "r"(reloadbuffer):"rax"
+	:
+	:"r" (leak), "r" (reloadbuffer)
+	:"rax"
 	);
 }
 

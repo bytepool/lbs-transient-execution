@@ -1,0 +1,41 @@
+getconf -a | grep X:
+
+WORD_BIT                           32
+PAGE_SIZE                          4096
+LEVEL1_ICACHE_SIZE                 32768
+LEVEL1_ICACHE_ASSOC                8
+LEVEL1_ICACHE_LINESIZE             64
+LEVEL1_DCACHE_SIZE                 32768
+LEVEL1_DCACHE_ASSOC                8
+LEVEL1_DCACHE_LINESIZE             64
+LEVEL2_CACHE_SIZE                  262144
+LEVEL2_CACHE_ASSOC                 4
+LEVEL2_CACHE_LINESIZE              64
+LEVEL3_CACHE_SIZE                  8388608
+LEVEL3_CACHE_ASSOC                 16
+LEVEL3_CACHE_LINESIZE              64
+
+
+
+--- Human readable summary ---
+
+Cacheline size: 64 bytes
+Pagesize: 4 kb (4096)
+  -> Caching a full page requires 64 cachelines (4kb / 64b)
+
+L1 associativity: 8-way
+  -> 8 cache-lines per set: 1 set = 512 bytes
+L1 size: 32 kb
+  -> 64 sets
+
+L2 associativity: 4-way
+  -> 4 cache-lines per set: 1 set = 256 bytes
+L2 size: 256 kb
+  -> 1024 sets
+
+L3 associativity: 16-way
+  -> 16 cache-lines per set: 1 set = 1024 bytes
+L3 size: 8 mb
+  -> 8192 sets
+
+Reminder: pages are chunks in memory loaded from disk on demand.

