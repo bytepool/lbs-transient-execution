@@ -12,7 +12,7 @@ In this work, we attempt to give an overview of the different transient executio
 
 Since memory access is orders of magnitude slower than modern CPUs, CPU manufacturers have come up with clever performance optimizations to effectively use the time while waiting for memory access operations to complete. These performance optimizations include the CPU features discussed in this section, and without these features many tasks run significantly slower, in some cases even 10x slower. However, it is also these optimizations that have lead to the vulnerabilities discussed in this report.
 
-The Spectre and Meltdown variants in particular rely on out-of-order execution, speculative execution and branch prediction to leak CPU internal information to an attacker. The MDS or RIDL vulnerabilities that were found later additionally rely on various CPU internal buffers to leak secrets across CPU threads (called hyperthreads in Intel architectures).
+The Spectre and Meltdown variants in particular rely on out-of-order execution, speculative execution and branch prediction to leak CPU internal information to an attacker. The MDS or RIDL vulnerabilities that were found later additionally rely on various CPU internal buffers to leak secrets across CPU threads (called hyper-threads in Intel architectures).
 
 In the following subsections, we will shortly outline what these CPU features do and how they work.
 
@@ -56,7 +56,7 @@ It is also important to remember that caches are organized into so called *cache
 
 The basic idea of a flush+reload attack is simple: the attacker identifies a specific shared memory location they want to monitor, for instance a specific line of code in a shared library, and uses the CPU instruction *clflush* to flush the corresponding cache line from memory, thus guaranteeing that it is no longer in cache. The attacker triggers the loading of the secret by the victim process, and finally they measure the time it takes to reload the flushed cache line. If the access is quick, the attacker knows that the cache line was accessed by the victim process since it was flushed.
 
-Some of the modern processors provide a very precise way to measure the execution time. For example on x86 there is `rdtsc` instruction. On ARM getting precise time measurements [can be more challenging](https://www.virusbulletin.com/virusbulletin/2018/07/does-malware-based-spectre-exist/#h3-challenges-armv7-poc), and the attacker might need to put some extra effort and, e.g. create its own timer by running a counter process in another thread. The precision of such timers is affected by events like context switches and hardware interrupts. When possible, the attacker can ask the OS scheduler to disttribute its process and the victim process in a certain way between the CPU cores (but this measure makes more sense for PoC code than for a real attack).
+Some of the modern processors provide a very precise way to measure the execution time. For example on x86 there is `rdtsc` instruction. On ARM getting precise time measurements [can be more challenging](https://www.virusbulletin.com/virusbulletin/2018/07/does-malware-based-spectre-exist/#h3-challenges-armv7-poc), and the attacker might need to put some extra effort and, e.g. create its own timer by running a counter process in another thread. The precision of such timers is affected by events like context switches and hardware interrupts. When possible, the attacker can ask the OS scheduler to distribute its process and the victim process in a certain way between the CPU cores (but this measure makes more sense for PoC code than for a real attack).
 
 #### Evict+Reload
 
@@ -65,7 +65,7 @@ Evict+reload is a variation of the flush+reload attack which does not use the *c
 
 #### Prime+Probe
 
-In a prime+probe attack, the attacker continously and systematically loads its own known data into every cache line in the cache (that is, accesses every *set* and every *way*) and measures the access time for each cache set, which is known as the priming step. Next, the attacker triggers the victim process, which will load new cache lines and evict some of the attackers data from the cache. Now the probe phase works exactly the same way as the prime phase, i.e., every cache line is accessed, and the access time is measured. If the access time for a particular cache set takes longer than before, the attacker knows that the victim process accessed that particular cache set.
+In a prime+probe attack, the attacker continuously and systematically loads its own known data into every cache line in the cache (that is, accesses every *set* and every *way*) and measures the access time for each cache set, which is known as the priming step. Next, the attacker triggers the victim process, which will load new cache lines and evict some of the attackers data from the cache. Now the probe phase works exactly the same way as the prime phase, i.e., every cache line is accessed, and the access time is measured. If the access time for a particular cache set takes longer than before, the attacker knows that the victim process accessed that particular cache set.
 
 
 ### Attacker model(s)
@@ -94,10 +94,10 @@ a technique to actively poison the branch predictor data and make the target
 code do branch predictions in a certain, useful to the adversary, way.
 
 Below is the list of vulnerabilities of this kind. We focus on the first three
-and describe them in detail in the following sections, and we only mention the
-others for completeness.
+and describe them in detail later, and we only mention the others for
+completeness.
 
-- Meltdown - Rogue Data Cache Load (RDCL)
+- Meltdown (aka Spectre v3) - Rogue Data Cache Load (RDCL)
 - Spectre v1 - Bounds Check Bypass (BCB)
 - Spectre v2 - Branch Target Injection (BTI)
 - Spectre-NG v3a - Rogue System Register Read (RSRR)
@@ -112,7 +112,7 @@ others for completeness.
 The initial Foreshadow attack was designed to bypass the [Intel
 SGX](https://en.wikipedia.org/wiki/Software_Guard_Extensions) (Software Guard
 eXtensions). Intel SGX provides a private execution environment, where a
-userspace applicaiton can keep its secret data (anything form Cryptographic
+userspace application can keep its secret data (anything from cryptographic
 keys to DRM authentication data) and work with it, without allowing even a more
 privileged code, like OS kernel, to access the private data. The attack relied
 on the speculative execution. The later Foreshadow-OS and Foreshadow-VM attacks
@@ -134,7 +134,7 @@ The following variants of this vulnerability have been assigned a CVE:
 
 In this section, we discuss a new class of transient execution vulnerabilities which were named "microarchitectural data sampling (MDS)" by Intel. Different variations of vulnerabilities in this class have been named "Zombieload" or "rogue in-flight data load (RIDL)" by different groups of researchers who discovered them.
 
-Unlike spectre and meltdown, MDS vulnerabilities do not use specific memory addresses to leak data, but instead use clever techniques to leak data that is being held in various Intel CPU internal buffers. This means that the attacker has limited control over which data is leaked and therefore needs to do additional filtering of the leaked data to find the information they are after. On the other hand, it is harder to mitigate these vulnerabilities.
+Unlike Spectre and Meltdown, MDS vulnerabilities do not use specific memory addresses to leak data, but instead use clever techniques to leak data that is being held in various Intel CPU internal buffers. This means that the attacker has limited control over which data is leaked and therefore needs to do additional filtering of the leaked data to find the information they are after. On the other hand, it is harder to mitigate these vulnerabilities.
 
 Since the buffers and related speculative behavior are unique to Intel architectures, these vulnerabilities do not seem to work directly on other microarchitectures.
 
@@ -152,7 +152,7 @@ The following variants of this vulnerability have been assigned a CVE:
 
 ### Load-Value Injection (LVI)
 
-Load-Value Injection (LVI) is one of the latest transient execution vulnerabilities [1]. They wondered if it is possible to turn the findings of Meltdown around: is it possible to inject poisoned data into the speculative execution of a victim? It turns out that that is possible, and by cleverly injecting poisoned data to hijack the control flow of the victim's speculative execution, it is possible to leak secrets of the victim!
+Load-Value Injection (LVI) is one of the latest transient execution vulnerabilities [1]. Some researchers wondered if you can turn the findings of Meltdown around: is it possible to inject poisoned data into the speculative execution of a victim? It turns out that that is possible, and by cleverly injecting poisoned data to hijack the control flow of the victim's speculative execution, it is possible to leak secrets of the victim!
 
 [1] https://lviattack.eu/lvi.pdf
 
@@ -164,7 +164,7 @@ In this section we discuss a subset of the different variants highlighted above 
 - Meltdown & Spectre (v1 - v3)
 - Microarchitectural Fill Buffer Data Sampling (MFBDS) / Zombieload / RIDL
 
-In addition, we adapt some known proof of concepts and apply them to new victim applications. We also look into possible mitigations.
+In addition, we adapt the original RIDL proof of concept to run on our machines, and we apply it to a slightly different use case. We also look into possible mitigations.
 
 ### Meltdown & Spectre
 
@@ -174,9 +174,9 @@ When a process running on a multi-user OS (like Linux or Windows) wants to
 read a file or send some data over network, it does so through a _system call_
 (syscall). It puts the syscall parameters into the CPU registers and executes
 a special CPU instruction (`int 0x80` or `sysenter` on x86, `cwc` or `swi`
-on ARM), which triggers a cpu interrupt and starts the interrupt handler in
+on ARM), which triggers a CPU interrupt and starts the interrupt handler in
 the OS code. The interrupt handler runs with kernel privileges, usually it
-can access any memory of any process or talk to any hadware directly—the code
+can access any memory of any process or talk to any hardware directly—the code
 inside the kernel is trusted. This allows the interrupt handler to serve the
 syscall request from the user process; for example, if the process requested to
 read 10 bytes from some file, the interrupt handler will talk to the HDD, read
@@ -201,8 +201,8 @@ handling algorithm looks like this:
 3. Unset the permission bits from step 1
 4. Return execution to the user process who issued syscall
 
-The Meltdown vulnerability takes advantage of the speculative execution and
-caches to read the kernel memory permission, bypassing the permission bits.
+Meltdown takes advantage of speculative execution and cache side-channels to
+read kernel memory, bypassing the permission bits.
 
 If the user process tries to read the kernel memory, this will cause another
 kind of interrupt which basically tells the kernel "this process is reading the
@@ -248,7 +248,7 @@ There are two typical ways to exploit this vulnerability:
    }
    ```
 
-2. Prime and Probe. This one works similarty, but now instead of flushing we
+2. Prime and Probe. This one works similarly, but now instead of flushing we
    fill the cache with our data, and then run the sensitive code to see if it
    will displace our data from cache.
 
@@ -329,7 +329,7 @@ will be taken by the target code from Spectre v1.
 The possibility of this attack comes from the fact that branch predictor
 counters are shared between different privilege levels. Modern processors
 provide no way of isolating them or manually clearing the branch
-predictor counters. While everyone is wating for CPU manufacturers
+predictor counters. While everyone is waiting for CPU manufacturers
 to design new processors will will have these issues addressed,
 engineers from Google proposed a completely software mitigation called
 [retpolines](https://support.google.com/faqs/answer/7625886) (return +
@@ -345,7 +345,7 @@ somewhere else.
 
 ### Microarchitectural Fill Buffer Data Sampling (MFBDS) / Zombieload / RIDL
 
-In the following, we focus on the first variant of MDS which uses the line fill buffer (LFB) to leak data. On Intel architectures the line fill buffer (LFB) is, among other things, used to temporarily store memory addresses that were not found in cache and are therefore being fetched from memory. This increases performance because several addresses can be requested to be fetched from memory at the same time without having to wait for the result. In some cases, data may already be available in the LFB, and the CPU will speculatively load the data and continue to execute, even though the data may be completely unrelated to the requested data. As you might expect after reading about specter and meltdown, this can be exploited by a clever attacker.
+In the following, we focus on the first variant of MDS which uses the line fill buffer (LFB) to leak data. On Intel architectures the line fill buffer (LFB) is, among other things, used to temporarily store memory addresses that were not found in cache and are therefore being fetched from memory. This increases performance because several addresses can be requested to be fetched from memory at the same time without having to wait for the result. In some cases, data may already be available in the LFB, and the CPU will speculatively load the data and continue to execute, even though the data may be completely unrelated to the requested data. As you might expect after reading about Specter and Meltdown, this can be exploited by a clever attacker.
 
 This vulnerability was discovered independently by several groups of researchers which lead to several papers, including Zombieload [1] and RIDL [2]. We will use the example from the RIDL [2] paper to explain the concept further:
 
@@ -380,9 +380,9 @@ You will notice that this looks a lot like any other flush+reload cache side-cha
 ```
 In this example, demand paging is used, an OS feature that loads pages when they are needed and not before. Note that the requested *new_page* in this example is a valid page that the process has access to. As the CPU sends the request for *new_page* to be paged in, it will allocate a new LFB entry for it. However, the LFB entry has not been filled with the correct data yet, so there is stale data from previous requests in the buffer, and as the CPU speculatively executes the next line which uses the value from *new_page*, it will use the stale value that is still stored in the LFB entry, thus dereferencing a potentially completely unrelated address that is potentially from another security domain. Of course, as the correct value for *new_page* arrives, the CPU will realize that it used the wrong value and roll back the execution, but at this point the cache has already been altered and the value can be leaked! The actual details of how the LFB works are a bit more complex, but for our purposes it will suffice. If you want to know more, please see the original research papers [1,2].
 
-There are different ways of reliably triggering this vulnerability, for instance using Intel's transactional syncrhonization extensions (TSX), but demand paging is the most interesting one because as a fundamental OS feature it even works in a browser.
+There are different ways of reliably triggering this vulnerability, for instance using Intel's transactional synchronization extensions (TSX), but demand paging is the most interesting one because as a fundamental OS feature it even works in a browser.
 
-The astute reader will have noticed that we leaked a stale value, but we had no control over which value was leaked. Therefore, careful syncrhonization with the victim process is needed in order for an attack to succeed. Also, additional filtering is needed in order to identify relevant pieces of data from irrelevent pieces.
+The astute reader will have noticed that we leaked a stale value, but we had no control over which value was leaked. Therefore, careful synchronization with the victim process is needed in order for an attack to succeed. Also, additional filtering is needed in order to identify relevant pieces of data from irrelevant pieces.
 
 TODO: Explain synchronization & filtering here.
 
@@ -390,13 +390,70 @@ TODO: Explain synchronization & filtering here.
 [2] https://mdsattacks.com/files/ridl.pdf
 
 
-### MFBDS PoC: leaking the ssh host key
+### The original MFBDS PoC: leaking /etc/shadow's first line (root hash)
 
-The proof of concept (PoC) from the RIDL paper [1] leaked the root password hash from the /etc/shadow file. We adapt their PoC in order to instead leak the private key of the ssh server (/etc/ssh/ssh_host_ecdsa_key), so that the attacker can impersonate the ssh server.
+The proof of concept (PoC) from the RIDL paper [1] leaked the root password hash from the /etc/shadow file [2]. In order to load the /etc/shadow file, the attacker can run a simple script [3]:
+```
+while true;
+    do taskset -c 0 passwd -S $USER > /dev/null;
+done;
+```
+With "taskset -c 0" we ensure the process is run on a CPU of our choosing. Since passwd is a setuid binary, it is allowed to continously load /etc/shadow in order to print a simple status message for this particular user. This guarantees that /etc/shadow passes through the Line Fill Buffer.
 
-TODO: adapt PoC and point to code and results here.
+The first line in /etc/shadow is often around 124 characters long and typically looks something like this:
+```
+root:$6$iX1OHhKK$HmjVzZ4bBn1o ... PvH2V67f8UPyd3gQ4l0:17787:0:99999:7:::
+```
+A key observation here is that the line always starts with "root:", so in order to filter for the correct cacheline, the attacker has to look for data which starts with that exact byte sequence. Note that on a modern Intel CPU a cacheline is 64 bytes, but you can only load 8 bytes into a 64-bit register, so you can only inspect 8 bytes at a time. Therefore, the attacker is effectively able to leak 1 to 3 bytes at a time. Since the entire line is around 124 characters long and the cacheline is 64 bytes, roughly half of the line can be leaked by looking for the cacheline that starts with "root:". In order to leak the second cacheline, it is easiest to make assumptions about the string after the root hash ends and to leak the rest of the line from the back. In the original PoC from the RIDL authors, they assumed that the end of the hash is ":0:9999", which would work with the example above.
+
+Now consider the following example where the last fields of the line have empty defaults:
+```
+root:$6$iX1OHhKK$HmjVzZ4bBn1o ... PvH2V67f8UPyd3gQ4l0:17787::::::
+```
+This was the case on the machine where we tested the PoC. As you might guess, the first part of the PoC worked well, but since the ending did not match the expectations, leaking the parts from the second cacheline failed. Unfortunately the original PoC had some hard coded assumptions about the string ending and a number of configuration options that did not work well on our test machine, so we adapted it so that it worked reliably for us. You can find the adapted PoC and its history at [4].
+
+An interesting observation was that the attacker process had to run on a different hyperthread than the victim process but on the same CPU core. If they run on the same hyperthread or on a different core, the leakage does not work.
+
+Here are some improvement ideas of the PoC that we plan to implement if we have the time:
+1. While leaking the first cache line, there is no backtracking: if we read false positivies (i.e., leak the wrong bytes), the PoC gets stuck. A simple improvement would be to add backtracking when stuck for a certain amount of rounds.
+2. In order to make the PoC more robust for different systems, one could try different hash endings and try to identify the correct one.
+3. The PoC relies on a specific Intel CPU feature called hardware transactions (TSX). The same PoC can be implemented without using this feature, albeit less reliably. If we have the time, we plan to implement a different version of this PoC.
 
 [1] https://mdsattacks.com/files/ridl.pdf
+[2] link to original PoC tag here
+[3] link to script here
+[4] link to fixed PoC here
+
+
+### A new use case for the MFBDS PoC: leaking a private ssh key
+
+In addition to adapting the original PoC to our test machine, we also extended it to a new use case, specifically leaking a private ssh key. This use case is slightly contrived since it requires the victim to continuously run ssh-add for their private key, but it shows that adaptation of the PoC to new use cases is possible without too much effort. Also, some servers that have scheduled ansible playbooks for server administration, this might be a feasible attack, although some knowledge of the ansible schedule would be required, and the key would have to be reloaded quite a few times in a short period of time.
+
+In order to load the private key, we run another simple script [1]:
+```
+while true; do
+  taskset -c 0 ssh-add -D &>/dev/null
+  taskset -c 1 ssh-add ./dummy_ecdsa &>/dev/null
+done
+```
+
+Since a private key has a fixed header and trailer, at least in the base64 encoded version, we can easily search for the corresponding cache lines, as we have done with the /etc/shadow root entry. In our example, this looks something like this:
+
+```
+-----BEGIN OPENSSH PRIVATE KEY-----
+b3BlbnNzaC1rZXktdjEAAAAABG5vbmUAAAAEbm9uZQAAAAAAAAABAAAAaAAAABNlY2RzYS
+qyAAAAE2VjZHNhLXNoYTItbmlzdHAyNTYAAAAIbmlzdHAyNTYAAABBBMmdILkd/l1l5RUn
+...
+u1FDdd1p40QRaqC85yKTXdp/WBDbNNKXvlPCm17KAmPyTG0oOSm06Evyeg2LO29EhbATl/
+0AAAAgNAPUPqtfLjkHsRTj69s3NuySrrt+/B4wV0nm3qPNKk4AAAAHYWxAY2FrZQE=
+-----END OPENSSH PRIVATE KEY-----
+```
+
+We adapted the PoC to allow for the slightly different character set that needs to be filtered for (base64 + newline), and we rewrote the PoC logic a little bit. Using the victim code above, we were able to successfully leak the beginning and the end of the dummy ECDSA private key. However, we were only able to leak the first and the last 64 byte of the key in base 64, so only about a quarter of it.
+
+[1] link to script here.
+[2] link to ssh PoC here.
+
 
 ### Retpolines PoC: demonstrating a protection against branch prediction vulnerabilities
 
