@@ -387,7 +387,7 @@ The astute reader will have noticed that we leaked a stale value, but we had no 
 TODO: Explain synchronization & filtering here.
 
 [1] https://zombieloadattack.com/zombieload.pdf <br>
-[2] https://mdsattacks.com/files/ridl.pdf
+[2] https://mdsattacks.com/files/ridl.pdf <br>
 
 
 ### The original MFBDS PoC: leaking /etc/shadow's first line (root hash)
@@ -419,10 +419,10 @@ Here are some improvement ideas of the PoC that we plan to implement if we have 
 2. In order to make the PoC more robust for different systems, one could try different hash endings and try to identify the correct one.
 3. The PoC relies on a specific Intel CPU feature called hardware transactions (TSX). The same PoC can be implemented without using this feature, albeit less reliably. If we have the time, we plan to implement a different version of this PoC.
 
-[1] https://mdsattacks.com/files/ridl.pdf
-[2] link to original PoC tag here
-[3] link to script here
-[4] link to fixed PoC here
+[1] https://mdsattacks.com/files/ridl.pdf <br>
+[2] link to original PoC tag here <br>
+[3] link to script here <br>
+[4] link to fixed PoC here <br>
 
 
 ### A new use case for the MFBDS PoC: leaking a private ssh key
@@ -451,8 +451,8 @@ u1FDdd1p40QRaqC85yKTXdp/WBDbNNKXvlPCm17KAmPyTG0oOSm06Evyeg2LO29EhbATl/
 
 We adapted the PoC to allow for the slightly different character set that needs to be filtered for (base64 + newline), and we rewrote the PoC logic a little bit. Using the victim code above, we were able to successfully leak the beginning and the end of the dummy ECDSA private key. However, we were only able to leak the first and the last 64 byte of the key in base 64, so only about a quarter of it.
 
-[1] link to script here.
-[2] link to ssh PoC here.
+[1] link to script here. <br>
+[2] link to ssh PoC here. <br>
 
 
 ### Retpolines PoC: demonstrating a protection against branch prediction vulnerabilities
