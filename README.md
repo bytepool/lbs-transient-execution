@@ -404,15 +404,15 @@ The first line in /etc/shadow is often around 124 characters long and typically 
 ```
 root:$6$iX1OHhKK$HmjVzZ4bBn1o ... PvH2V67f8UPyd3gQ4l0:17787:0:99999:7:::
 ```
-A key observation here is that the line always starts with "root:", so in order to filter for the correct cacheline, the attacker has to look for data which starts with that exact byte sequence. Note that on a modern Intel CPU a cacheline is 64 bytes, but you can only load 8 bytes into a 64-bit register, so you can only inspect 8 bytes at a time. Therefore, the attacker is effectively able to leak 1 to 3 bytes at a time. Since the entire line is around 124 characters long and the cacheline is 64 bytes, roughly half of the line can be leaked by looking for the cacheline that starts with "root:". In order to leak the second cacheline, it is easiest to make assumptions about the string after the root hash ends and to leak the rest of the line from the back. In the original PoC from the RIDL authors, they assumed that the end of the hash is ":0:9999", which would work with the example above.
+A key observation here is that the line always starts with "root:", so in order to filter for the correct cache line, the attacker has to look for data which starts with that exact byte sequence. Note that on a modern Intel CPU a cache line is 64 bytes, but you can only leak 1 or 2 bytes at a time due to the nature of the flush+reload side channel (i.e., leaking the value through array indexing). Since the entire line is around 124 characters long and the cache line is 64 bytes, roughly half of the secret can be leaked by looking for the cache line that starts with "root:". In order to leak the second cache line, it is easiest to make assumptions about which substring terminates the root hash, and to leak the remainder of the secret from the back. In the original PoC from the RIDL authors, they assumed that the terminating substring is ":0:9999", which would work with the example above.
 
 Now consider the following example where the last fields of the line have empty defaults:
 ```
 root:$6$iX1OHhKK$HmjVzZ4bBn1o ... PvH2V67f8UPyd3gQ4l0:17787::::::
 ```
-This was the case on the machine where we tested the PoC. As you might guess, the first part of the PoC worked well, but since the ending did not match the expectations, leaking the parts from the second cacheline failed. Unfortunately the original PoC had some hard coded assumptions about the string ending and a number of configuration options that did not work well on our test machine, so we adapted it so that it worked reliably for us. You can find the adapted PoC and its history at [4].
+This was the case on the machine where we tested the PoC. As you might guess, leaking the first cache line worked well, but since the ending did not match the expectations, leaking the second cache line failed. Unfortunately the original PoC had some hard coded assumptions about the string ending and a number of configuration options that did not work well on our test machine, so we adapted it so that it worked reliably for us. You can find the adapted PoC and its history in a cloned repository at [4].
 
-An interesting observation was that the attacker process had to run on a different hyperthread than the victim process but on the same CPU core. If they run on the same hyperthread or on a different core, the leakage does not work.
+An interesting observation was that the attacker process had to run on a different hyperthread (CPUs visible to the OS) than the victim process, but still on the same CPU core. If they run on the same hyperthread or on a different core, the leakage does not work.
 
 Here are some improvement ideas of the PoC that we plan to implement if we have the time:
 1. While leaking the first cache line, there is no backtracking: if we read false positivies (i.e., leak the wrong bytes), the PoC gets stuck. A simple improvement would be to add backtracking when stuck for a certain amount of rounds.
@@ -420,25 +420,30 @@ Here are some improvement ideas of the PoC that we plan to implement if we have 
 3. The PoC relies on a specific Intel CPU feature called hardware transactions (TSX). The same PoC can be implemented without using this feature, albeit less reliably. If we have the time, we plan to implement a different version of this PoC.
 
 [1] https://mdsattacks.com/files/ridl.pdf <br>
-[2] link to original PoC tag here <br>
-[3] link to script here <br>
-[4] link to fixed PoC here <br>
+[2] https://github.com/vusec/ridl <br>
+[3] https://github.com/vusec/ridl/blob/master/exploits/shadow/passwd.sh <br>
+[4] https://github.com/bytepool/ridl-clone/blob/master/exploits/shadow/leak.c <br>
 
 
 ### A new use case for the MFBDS PoC: leaking a private ssh key
 
-In addition to adapting the original PoC to our test machine, we also extended it to a new use case, specifically leaking a private ssh key. This use case is slightly contrived since it requires the victim to continuously run ssh-add for their private key, but it shows that adaptation of the PoC to new use cases is possible without too much effort. Also, some servers that have scheduled ansible playbooks for server administration, this might be a feasible attack, although some knowledge of the ansible schedule would be required, and the key would have to be reloaded quite a few times in a short period of time.
+In addition to adapting the original PoC to our test machine, we also extended it to a new use case, specifically leaking a private ssh key. This use case is slightly contrived since it requires the victim to continuously load their private key, but it shows that adaptation of the PoC to new use cases is possible.
 
-In order to load the private key, we run another simple script [1]:
+In order to continously load the private key, we tried to run another simple script [1]:
 ```
 while true; do
-  taskset -c 0 ssh-add -D &>/dev/null
-  taskset -c 1 ssh-add ./dummy_ecdsa &>/dev/null
+  taskset -c 1 ssh-add -D &>/dev/null
+  taskset -c 0 ssh-add ./dummy_ecdsa &>/dev/null
+done
+```
+However, at least for initial testing purposes, this does not leak reliably enough, so in order to test that the side-channel works as expected, we instead loaded the key with cat:
+```
+while true; do
+  taskset -c 0 cat ./dummy_ecdsa &>/dev/null
 done
 ```
 
-Since a private key has a fixed header and trailer, at least in the base64 encoded version, we can easily search for the corresponding cache lines, as we have done with the /etc/shadow root entry. In our example, this looks something like this:
-
+Since a private key has a fixed header and trailer in the base64 encoded version, we can search for the corresponding cache lines, as we have done with the /etc/shadow root entry. In our example, this looks something like this:
 ```
 -----BEGIN OPENSSH PRIVATE KEY-----
 b3BlbnNzaC1rZXktdjEAAAAABG5vbmUAAAAEbm9uZQAAAAAAAAABAAAAaAAAABNlY2RzYS
@@ -449,10 +454,12 @@ u1FDdd1p40QRaqC85yKTXdp/WBDbNNKXvlPCm17KAmPyTG0oOSm06Evyeg2LO29EhbATl/
 -----END OPENSSH PRIVATE KEY-----
 ```
 
-We adapted the PoC to allow for the slightly different character set that needs to be filtered for (base64 + newline), and we rewrote the PoC logic a little bit. Using the victim code above, we were able to successfully leak the beginning and the end of the dummy ECDSA private key. However, we were only able to leak the first and the last 64 byte of the key in base 64, so only about a quarter of it.
+In order to leak the first cache line, we adapted the shadow RIDL PoC to allow for the slightly different character set that needs to be filtered for (base64 + newline). In the original PoC, the characters are iterated over for loop, but since we needed to include line breaks and spaces, which are numerically quite a bit apart from the remaining characters, we figured it might be more convenient to iterate over an array of valid values. This naive implementation lead to another moment of enlightenment: after implementing the logic with an array of valid chars, the secret leakage became totally unreliable, seemingly leaking nonsense, which led us to conclude that the array we added interfered with the side-channel because we unwittingly added memory lookups to our attack code which messed up the LFB and the cache. So we learned that memory lookups must be avoided in the attack code at all costs. After adapting for the different valid characters, leaking the first cache line worked as intended (using the 'cat' victim process).
 
-[1] link to script here. <br>
-[2] link to ssh PoC here. <br>
+We also attempted to leak the final cache line, but so far we have failed. If we presume that we know the final 6 or 7 bytes of the second cache line, we can successfully leak the second cache line, but it does not work for any of the other cache lines. Something in the PoC binds it to the second cache line, but we have not figured out yet which part or how to change it. We will continue to work on this.
+
+[1] https://github.com/bytepool/ridl-clone/blob/master/exploits/shadow/ssh-agent.sh <br>
+[2] https://github.com/bytepool/ridl-clone/blob/master/exploits/shadow/leak-ssh.c <br>
 
 
 ### Retpolines PoC: demonstrating a protection against branch prediction vulnerabilities
