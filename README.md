@@ -394,7 +394,9 @@ There are different ways of reliably triggering this vulnerability, for instance
 
 The astute reader will have noticed that we leaked a stale value, but we had no control over which value was leaked. Therefore, careful synchronization with the victim process is needed in order for an attack to succeed. Also, additional filtering is needed in order to identify relevant pieces of data from irrelevant pieces.
 
-TODO: Explain synchronization & filtering here.
+Synchronizing the attack so that it leaks the sensitive data in question and not something else is highly non-trivial. The original paper [2] suggests a few ways to do this all of which rely on some features on the victim process and make it less practical. But the original PoC code, which works in a very realistic scenario, manages to accomplish it without synchronization. Instead, it tries to leak whatever it can and tries to filter out the irrelevant bits using some information about the leaked data (like specific format in which it is stored). This technique is called "mask-sub-rotate".
+
+TODO: write more on the technique
 
 1. <https://zombieloadattack.com/zombieload.pdf>
 2. <https://mdsattacks.com/files/ridl.pdf>
