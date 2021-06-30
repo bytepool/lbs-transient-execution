@@ -1,3 +1,7 @@
+---
+title: A Case Study of Transient Execution Vulnerabilities
+...
+
 # Report Header
 
 **Authors:**  
@@ -6,7 +10,7 @@ Ivan Oleynikov (ivanol@chalmers.se)
 
 **FIRE group number:** 45
 
-**Note to opponents:**  
-You can find the latest version of this document at   
-https://github.com/bytepool/lbs-transient-execution
+You can find the online version of this document at
+<https://github.com/bytepool/lbs-transient-execution>, and the source code we
+used at <https://github.com/bytepool/ridl-clone/>.
 

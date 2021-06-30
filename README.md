@@ -1,4 +1,4 @@
-# A Case Study of Transient Execution Vulnerabilities
+# Report
 
 ## Introduction & Background
 
@@ -395,7 +395,8 @@ There are different ways of reliably triggering this vulnerability, for instance
 The astute reader will have noticed that we leaked a stale value, but we had no control over which value was leaked. Therefore, careful synchronization with the victim process is needed in order for an attack to succeed. Also, additional filtering is needed in order to identify relevant pieces of data from irrelevant pieces.
 
 Synchronizing the attack so that it leaks the sensitive data in question and not something else is highly non-trivial. The original paper [2] suggests a few ways to do this all of which rely on some features on the victim process and make it less practical. But the original PoC code, which works in a very realistic scenario, manages to accomplish it without synchronization. Instead, it tries to leak whatever it can and tries to filter out the irrelevant bits using some information about the leaked data (like specific format in which it is stored). This technique is called _mask-sub-rotate_.
-_Mask-sub-rotate._ As you remember from "Introduction & Background" section, the Flush+Reload attacking technique uses uses speculative execution to load a secret and then uses secret as an index to read a value in a public array. The CPU will notice that speculation was incorrect and rollback its state, but it will not rollback the cache state, thus leaking the secret to attacker. This way, the possible domain of the secret is naturally limited by the domain of the array indices. But what if the secret is actually a big (say, 64 bit) number and we want to leak only part of it? We cannot possibly allocate an array of $2^64$ bits. To solve this, _mask-sub-rotate_ does the _mask_ and _rotate_:
+
+_Mask-sub-rotate._ As you remember from "Introduction & Background" section, the Flush+Reload attacking technique uses uses speculative execution to load a secret and then uses secret as an index to read a value in a public array. The CPU will notice that speculation was incorrect and rollback its state, but it will not rollback the cache state, thus leaking the secret to attacker. This way, the possible domain of the secret is naturally limited by the domain of the array indices. But what if the secret is actually a big (say, 64 bit) number and we want to leak only part of it? We cannot possibly allocate an array of $2^{64}$ bits. To solve this, _mask-sub-rotate_ does the _mask_ and _rotate_:
 
 1. `secret = secret & mask`{.c}, where `mask` has `0` bits in the positions we are not interested in;
 2. `rotate = secret >> shift`{.c}, where shift specifies the position of the first interesting bit in `secret`.
@@ -440,16 +441,18 @@ This was the case on the Archlinux machine where we tested the PoC. As you might
 
 An interesting observation was that the attacker process had to run on a different hyperthread (CPUs visible to the OS) than the victim process, but still on the same CPU core. If they run on the same hyperthread or on a different core, the leakage does not work.
 
-1. <https://mdsattacks.com/files/ridl.pdf>
-2. <https://github.com/vusec/ridl>
-3. <https://github.com/vusec/ridl/blob/master/exploits/shadow/passwd.sh>
-4. <https://github.com/bytepool/ridl-clone/blob/master/exploits/shadow/leak.c>
-
 Here are some improvement ideas of the PoC that we plan to implement if we have the time:
 
 1. While leaking the first cache line, there is no backtracking: if we read false positivies (i.e., leak the wrong bytes), the PoC gets stuck. A simple improvement would be to add backtracking when stuck for a certain amount of rounds.
 2. In order to make the PoC more robust for different systems, one could try different hash endings and try to identify the correct one.
 3. The PoC relies on a specific Intel CPU feature called hardware transactions (TSX). The same PoC can be implemented without using this feature, albeit less reliably. If we have the time, we plan to implement a different version of this PoC.
+
+[ ]{}
+
+1. <https://mdsattacks.com/files/ridl.pdf>
+2. <https://github.com/vusec/ridl>
+3. <https://github.com/vusec/ridl/blob/master/exploits/shadow/passwd.sh>
+4. <https://github.com/bytepool/ridl-clone/blob/master/exploits/shadow/leak.c>
 
 ### A new use case for the MFBDS PoC: leaking a private ssh key
 
@@ -464,7 +467,7 @@ while true; do
 done
 ```
 
-However, at least for initial testing purposes, this does not leak reliably enough, so in order to test that the side-channel works as expected, we instead loaded the key with cat:
+But this did not work reliably enough, so we gave the attacker a bit more power (initially for the testing purposes) and we instead loaded the key with `cat`{.sh}:
 
 ```sh
 while true; do
@@ -488,7 +491,25 @@ In order to leak the first cache line, we adapted the shadow RIDL PoC to allow f
 
 We also managed to successfully leak the second cache line of the key, but only if we let the adversay know a few last bytes of it (the attack needs to know some suffix to recognize the correct data in the noise). We were expecting that the same trick as the one that worked with the second cache line will work with the following cache lines, but it does not—something in the PoC code seems to be binding it to the second cache line, but we did not figure out what it is.
 
-The PoC recovers the first two cache lines of SSH key in 29 seconds.
+The PoC recovers the first two cache lines of SSH key in 29 seconds if the victim runs `cat ./dummy_ecdsa`{.sh}. We couldn't make it work for `ssh-add ./dummy_ecdsa`{.sh}. Look like there is too much noise, or it could be that `ssh-add`{.sh} loads the key in some unusual way: by aligning it in the memory not the way we expect, or reading it and parsing in smaller chunks.
 
 1. <https://github.com/bytepool/ridl-clone/blob/master/exploits/shadow/ssh-agent.sh>
 2. <https://github.com/bytepool/ridl-clone/blob/master/exploits/shadow/leak-ssh.c>
+
+## Conclusion
+
+In this project, we studied the existing transient execution CPU vulnerabilites, and summarized the key ones in our report—focusing on their application scenarios, limitations, mitigations and their relationship to each other.
+
+We chose Zombieload/RIDL as a case study to focus on. We adapted its original PoC to work on our machine, and managed to leak the root hash from `/etc/shadow` by an unprivileged user.
+
+We further modified the original PoC to leak the first two cache lines of user's SSH private key instead of root hash. The full attack takes about 29 seconds if a victim is running `cat ./dummy_ecdsa`{.sh} in a loop, albeit a lot longer if the victim is doing something more realistic like `ssh-add ./dummy_ecdsa`{.sh}.
+
+We also planned but did not finish the following (pointers for "future work" in case future students want to work on something similar for their course project).
+
+1. Adding backtracking to the original exploit. The exploit extracts secret byte by byte, each new iteration depending on the previously discovered bytes; and if it some points it extracts an incorrect value, it hangs. A simple backtracking check could make this exploit more robust: if we see that the current iteration is failing to find the byte for too long, we could go one byte back and try to find it again.
+
+2. Implement the same PoC without using Intel TSX.
+
+3. Leak more parts of the SSH key in our second PoC. Currently, we leak only the first two cache lines. And we have not figured out why the same exploit does not work for the following cache lines of the key.
+
+4. Make the PoC works even if the victim runs `ssh-add ./dummy_ecdsa`{.sh} (unstead of using `cat`{.sh}). This will make PoC work in a more realistic scenario.

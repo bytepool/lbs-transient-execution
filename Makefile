@@ -8,7 +8,7 @@ PDFVIEWER ?= okular
 all: $(TITLE).pdf
 
 $(TITLE).pdf: $(TITLE).md header.md contributions.md
-	cat header.md $(TITLE).md contributions.md | pandoc -o $(TITLE).pdf
+	cat header.md $(TITLE).md contributions.md | pandoc --toc -o $(TITLE).pdf
 
 view:
 	$(PDFVIEWER) $(TITLE).pdf &>/dev/null &
