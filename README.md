@@ -394,9 +394,17 @@ There are different ways of reliably triggering this vulnerability, for instance
 
 The astute reader will have noticed that we leaked a stale value, but we had no control over which value was leaked. Therefore, careful synchronization with the victim process is needed in order for an attack to succeed. Also, additional filtering is needed in order to identify relevant pieces of data from irrelevant pieces.
 
-Synchronizing the attack so that it leaks the sensitive data in question and not something else is highly non-trivial. The original paper [2] suggests a few ways to do this all of which rely on some features on the victim process and make it less practical. But the original PoC code, which works in a very realistic scenario, manages to accomplish it without synchronization. Instead, it tries to leak whatever it can and tries to filter out the irrelevant bits using some information about the leaked data (like specific format in which it is stored). This technique is called "mask-sub-rotate".
+Synchronizing the attack so that it leaks the sensitive data in question and not something else is highly non-trivial. The original paper [2] suggests a few ways to do this all of which rely on some features on the victim process and make it less practical. But the original PoC code, which works in a very realistic scenario, manages to accomplish it without synchronization. Instead, it tries to leak whatever it can and tries to filter out the irrelevant bits using some information about the leaked data (like specific format in which it is stored). This technique is called _mask-sub-rotate_.
+_Mask-sub-rotate._ As you remember from "Introduction & Background" section, the Flush+Reload attacking technique uses uses speculative execution to load a secret and then uses secret as an index to read a value in a public array. The CPU will notice that speculation was incorrect and rollback its state, but it will not rollback the cache state, thus leaking the secret to attacker. This way, the possible domain of the secret is naturally limited by the domain of the array indices. But what if the secret is actually a big (say, 64 bit) number and we want to leak only part of it? We cannot possibly allocate an array of $2^64$ bits. To solve this, _mask-sub-rotate_ does the _mask_ and _rotate_:
 
-TODO: write more on the technique
+1. `secret = secret & mask`{.c}, where `mask` has `0` bits in the positions we are not interested in;
+2. `rotate = secret >> shift`{.c}, where shift specifies the position of the first interesting bit in `secret`.
+
+Both operations are done speculatively right before using `secret` to index. They basically remove the irrelevant parts of `secret`. Another challenge of this attack is that we have no control over what value is leaked, and a lot of the time we will be leaking garbage. To filter out the relevant results, the _mask-sub-rotate_ does the _sub_ step:
+
+1. `secret = secret - expected_suffix`{.c}, where the `expected_suffix` is the value we expect the first bits of actual secret to have.
+
+We can repeat the above three steps multiple times to leak a long secret byte by byte. With each iteration, the length of `expected_suffix` in bits will increase as the precision of our filtering.
 
 1. <https://zombieloadattack.com/zombieload.pdf>
 2. <https://mdsattacks.com/files/ridl.pdf>
